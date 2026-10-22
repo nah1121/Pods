@@ -460,11 +460,14 @@ if (d[4] == 0x08)
         else if (d[4] == 0x17) yield return "firmware info";
         else if (d[4] == 0x06)
         {
-            string r = d.Length >= 8 ? (d[7] != 0 ? "in" : "out") : "?";
-            string l = d.Length >= 9 ? (d[8] != 0 ? "in" : "out") : "?";
-            yield return $"in-ear R={r} L={l}";
+            var buds = AapDecoder.ParseBudState(d);
+            yield return $"bud state role={buds.Role} connected={buds.Connected}";
         }
-        else if (d[4] == 0x08) yield return "role setup";
+        else if (d[4] == 0x08)
+        {
+            int n = AapDecoder.ParseConnectedFrom08(d);
+            yield return n >= 0 ? $"bud setup connected={n}" : "bud setup";
+        }
         else yield return $"cmd 0x{d[4]:x2} ({d.Length} B)";
     }
 
