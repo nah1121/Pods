@@ -20,12 +20,19 @@ public partial class MainWindow : Window
 {
     AapSession _session;
     volatile bool _paused;
-    readonly ConcurrentQueue<string> _pending = new();
+    // Each queued item carries its own key. Sharing a single field for this meant
+    // every frame flushed in one batch got the same key, so tagging two frames
+    // wrote the same key twice and the second tag replaced the first.
+    readonly ConcurrentQueue<(string Line, string Key)> _pending = new();
     readonly List<(string Key, string Label)> _map = new();
     readonly HashSet<string> _seen = new(StringComparer.Ordinal);
 
     string _lastKey;
     string _filter = "";
+
+    /// <summary>Every frame received this session, in order, so bursts can be tagged.</summary>
+    readonly List<(string Key, string Line)> _all = new();
+    int _markIndex;
 
     public MainWindow()
     {
@@ -109,7 +116,8 @@ public partial class MainWindow : Window
                     // Track the most recent frame of any kind, so "Tag last frame"
                     // always tags what just arrived - not the last unseen code.
                     _lastKey = key;
-                    _pending.Enqueue(line);
+                    _all.Add((key, line));
+                    _pending.Enqueue((line, key));
                 });
                 AppendLog(line);
             }
@@ -121,11 +129,15 @@ public partial class MainWindow : Window
     void Flush()
     {
         int added = 0;
-        while (_pending.TryDequeue(out var line) && added < 200)
+        while (_pending.TryDequeue(out var p) && added < 200)
         {
+            string line = p.Line;
             if (_filter.Length > 0 && !line.Contains(_filter, StringComparison.OrdinalIgnoreCase))
                 continue;
-            var item = new ListBoxItem { Content = line };
+            var item = new ListBoxItem { Content = line, Tag = p.Key };
+            // Show an existing label inline so it is obvious what is already tagged.
+            string existing = LabelOf(p.Key);
+            if (existing != null) item.Content = line + "   =>  " + existing;
             FrameList.Items.Add(item);
             added++;
         }
@@ -167,9 +179,11 @@ public partial class MainWindow : Window
         if (note.Length == 0) note = "(no note)";
         string line = $"=== MARK [{DateTime.Now:HH:mm:ss.fff}] {note} ===";
         AppendLog(line);
-        _pending.Enqueue(line);
+        _pending.Enqueue((line, null));
         Flush();
         MarkBox.Clear();
+        // Everything after this point is the burst caused by the next action.
+        _markIndex = _all.Count;
         FooterHint.Text = "Marked: " + note;
     }
 
@@ -189,6 +203,69 @@ public partial class MainWindow : Window
         catch (Exception ex) { FooterHint.Text = "Could not open log: " + ex.Message; }
     }
 
+    void TagSelected_Click(object sender, RoutedEventArgs e)
+    {
+        string label = LabelBox.Text.Trim();
+        if (label.Length == 0) { FooterHint.Text = "Type a label first."; return; }
+
+        var keys = FrameList.SelectedItems
+            .OfType<ListBoxItem>()
+            .Select(i => i.Tag as string)
+            .Where(k => k != null)
+            .Distinct()
+            .ToList();
+
+        if (keys.Count == 0)
+        {
+            FooterHint.Text = "Select one or more frames first (click, or ctrl/shift-click).";
+            return;
+        }
+
+        foreach (var k in keys)
+        {
+            _map.RemoveAll(m => m.Key == k);
+            _map.Add((k, label));
+            LogTag(k, label);
+        }
+        LabelBox.Clear();
+        RenderMap();
+        FooterHint.Text = $"Tagged {keys.Count} frame(s): {label}";
+    }
+
+    void FrameList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        int n = FrameList.SelectedItems.Count;
+        SelectionInfo.Text = n == 0
+            ? "Click or ctrl/shift-click frames to select several, then Tag selected."
+            : $"{n} frame(s) selected - type a label and press Tag selected.";
+    }
+
+    /// <summary>Label every frame that arrived since the previous Mark.</summary>
+    void TagSinceMark_Click(object sender, RoutedEventArgs e)
+    {
+        string label = LabelBox.Text.Trim();
+        if (label.Length == 0) { FooterHint.Text = "Type a label first."; return; }
+
+        if (_all.Count <= _markIndex)
+        {
+            FooterHint.Text = "No new frames since the last mark.";
+            return;
+        }
+
+        var keys = _all.Skip(_markIndex).Select(f => f.Key).Distinct().ToList();
+        foreach (var k in keys)
+        {
+            _map.RemoveAll(m => m.Key == k);
+            _map.Add((k, label));
+            LogTag(k, label);
+        }
+        int n = _all.Count - _markIndex;
+        _markIndex = _all.Count;
+        LabelBox.Clear();
+        RenderMap();
+        FooterHint.Text = $"Tagged {n} frame(s) ({keys.Count} distinct) since the last mark: {label}";
+    }
+
     void Tag_Click(object sender, RoutedEventArgs e)
     {
         if (_lastKey == null)
@@ -201,6 +278,7 @@ public partial class MainWindow : Window
 
         _map.RemoveAll(m => m.Key == _lastKey);
         _map.Add((_lastKey, label));
+        LogTag(_lastKey, label);
         LabelBox.Clear();
         RenderMap();
         FooterHint.Text = "Tagged: " + _lastKey;
@@ -218,6 +296,20 @@ public partial class MainWindow : Window
     void LabelBox_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter) Tag_Click(sender, e);
+    }
+
+    /// <summary>Record a tag in the log too, so the mapping can be correlated with frames.</summary>
+    void LogTag(string key, string label)
+    {
+        AppendLog($"=== TAG [{DateTime.Now:HH:mm:ss.fff}] {label} :: {key} ===");
+    }
+
+    /// <summary>Existing label for a frame key, or null.</summary>
+    string LabelOf(string key)
+    {
+        if (key == null) return null;
+        foreach (var m in _map) if (m.Key == key) return m.Label;
+        return null;
     }
 
     void RenderMap()

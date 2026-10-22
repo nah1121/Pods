@@ -66,6 +66,8 @@
                              Background="{StaticResource BgBrush}" BorderBrush="{StaticResource BorderBrush}"
                              BorderThickness="1" FontFamily="{StaticResource MonoFont}" FontSize="11.5"
                              Foreground="{StaticResource TextDimBrush}"
+                             SelectionMode="Extended"
+                             SelectionChanged="FrameList_SelectionChanged"
                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              HorizontalContentAlignment="Stretch">
@@ -101,13 +103,18 @@
                                  BorderBrush="{StaticResource BorderHiBrush}" Padding="8,4"
                                  KeyDown="LabelBox_KeyDown"/>
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="Tag last frame" Style="{StaticResource PrimaryButton}"
-                                    Click="Tag_Click" Padding="12,6" MinWidth="0"/>
+                            <Button Content="Tag selected" Style="{StaticResource PrimaryButton}"
+                                    Click="TagSelected_Click" Padding="12,6" MinWidth="0"/>
+                            <Button Content="Tag last frame" Style="{StaticResource GhostButton}"
+                                    Click="Tag_Click" Padding="12,6" MinWidth="0" Margin="8,0,0,0"/>
                             <Button Content="Undo" Style="{StaticResource GhostButton}"
                                     Click="Undo_Click" Padding="12,6" MinWidth="0" Margin="8,0,0,0"/>
                         </StackPanel>
+                        <TextBlock x:Name="SelectionInfo" Style="{StaticResource Dim}" FontSize="11"
+                                   Margin="0,6,0,0" TextWrapping="Wrap"
+                                   Text="Click or ctrl/shift-click frames to select several, then Tag selected."/>
                         <TextBlock Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0"
-                                   Text="Mark writes a timestamped note into the log so a physical state can be lined up with the frames around it."/>
+                                   Text="A physical action often produces a burst of frames. Mark writes a timestamped note into the log, and Tag since mark labels every frame that arrived after the previous mark."/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                             <TextBox x:Name="MarkBox" Height="26" FontSize="12" Width="170"
                                      Background="{StaticResource BgBrush}" Foreground="{StaticResource TextBrush}"
@@ -116,6 +123,9 @@
                             <Button Content="Mark" Style="{StaticResource GhostButton}"
                                     Click="Mark_Click" Padding="12,5" MinWidth="0" Margin="8,0,0,0"/>
                         </StackPanel>
+                        <Button Content="Tag since last mark" Style="{StaticResource GhostButton}"
+                                Click="TagSinceMark_Click" Padding="12,5" MinWidth="0" Margin="0,8,0,0"
+                                HorizontalAlignment="Left"/>
                     </StackPanel>
 
                     <Border Grid.Row="3" Background="{StaticResource BgBrush}" BorderBrush="{StaticResource BorderBrush}"
