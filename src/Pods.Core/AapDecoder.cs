@@ -129,30 +129,42 @@ public static class AapDecoder
         _ => "unknown"
     };
 
-    /// <summary>In-ear detection state.</summary>
-    /// <param name="Role">Byte 6 - alternates between 0 and 1; meaning unknown.</param>
-    /// <param name="Mask">Byte 7 - bitmask of which buds are in an ear.</param>
-    public readonly record struct EarFlags(byte Role, byte Mask, bool LeftIn, bool RightIn);
+    /// <summary>Bud link state reported by cmd 0x06 / cmd 0x08.</summary>
+    /// <param name="Role">Byte 6 of cmd 0x06 - 1 or 2, a primary/secondary index.</param>
+    /// <param name="Connected">How many buds are connected to the host.</param>
+    public readonly record struct BudState(byte Role, int Connected);
 
     /// <summary>
-    /// Parse an in-ear detection frame (cmd 0x06).
+    /// Parse the bud link state from a cmd 0x06 frame.
     ///
-    /// Captured frames are 8 bytes:
-    ///   04 00 04 00 06 00 &lt;role&gt; &lt;mask&gt;
+    ///   04 00 04 00 06 00 &lt;role&gt; &lt;connected&gt;
     ///
-    /// Byte 7 is a bitmask, not a pair of flags: the values observed are 0x00
-    /// (neither bud), 0x01 (one bud) and 0x03 (both buds) - 0x02 never appears,
-    /// which is what you would expect from a bitmask when only one bud is worn.
+    /// Verified by capturing three physical states in sequence:
     ///
-    ///   bit 0 -> left bud     (ASSUMED - see docs/PROTOCOL.md)
-    ///   bit 1 -> right bud
+    ///   both buds in the closed case  ->  06 00 01 01   (1 connected)
+    ///   one bud taken out of the case ->  06 00 01 02   (2 connected)
+    ///   both buds in the ears         ->  06 00 02 02   (2 connected)
+    ///
+    /// So byte 7 counts the buds connected to the host. This is link state - it is
+    /// NOT in-ear detection. See docs/PROTOCOL.md.
     /// </summary>
-    public static EarFlags ParseEar(byte[] d)
+    public static BudState ParseBudState(byte[] d)
     {
         if (d == null || d.Length < 6 || d[4] != 0x06) return default;
         byte role = d.Length >= 7 ? d[6] : (byte)0;
-        byte mask = d.Length >= 8 ? d[7] : (byte)0;
-        return new EarFlags(role, mask, (mask & 0x01) != 0, (mask & 0x02) != 0);
+        int connected = d.Length >= 8 ? d[7] : 0;
+        return new BudState(role, connected);
+    }
+
+    /// <summary>
+    /// Parse the bud link state from a cmd 0x08 frame:
+    ///   04 00 04 00 08 00 &lt;connected&gt; ...
+    /// Byte 6 counts the connected buds (observed 0x01 with one, 0x02 with both).
+    /// </summary>
+    public static int ParseConnectedFrom08(byte[] d)
+    {
+        if (d == null || d.Length < 7 || d[4] != 0x08) return -1;
+        return d[6];
     }
 
     /// <summary>Parse a settings frame (cmd 0x09): the sub-command and its value.</summary>

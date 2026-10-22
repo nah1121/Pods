@@ -183,6 +183,15 @@ public sealed class AapSession : IDisposable
     public bool? LeftInEar { get; private set; }
     public bool? RightInEar { get; private set; }
     public DateTime? InEarChangedAt { get; private set; }
+
+    /// <summary>
+    /// How many buds are currently connected over the AAP channel, as reported by
+    /// cmd 0x06 / cmd 0x08. This is link state, not in-ear state.
+    /// </summary>
+    public int? PodsConnected { get; private set; }
+
+    /// <summary>Primary/secondary index reported by cmd 0x06.</summary>
+    public byte? BudRole { get; private set; }
     public string ModelName { get; private set; }
     public string Firmware { get; private set; }
     public string Serial { get; private set; }
@@ -323,12 +332,18 @@ public sealed class AapSession : IDisposable
             RawWatch.Enqueue(d);
         }
 
-if (d[4] == 0x06)
+if (d[4] == 0x08)
         {
-            // In-ear detection (cmd 0x06): byte 7 is a bitmask of which buds are in.
-            var ear = AapDecoder.ParseEar(d);
-            LeftInEar = ear.LeftIn;
-            RightInEar = ear.RightIn;
+            int n = AapDecoder.ParseConnectedFrom08(d);
+            if (n >= 0) PodsConnected = n;
+        }
+
+        if (d[4] == 0x06)
+        {
+            // Bud link state: byte 7 counts the buds connected to the host.
+            var buds = AapDecoder.ParseBudState(d);
+            PodsConnected = buds.Connected;
+            BudRole = buds.Role;
             InEarChangedAt = DateTime.Now;
         }
     }

@@ -22,7 +22,8 @@ First public release.
 - Six of the eleven settings are read back by the AirPods; the other five are
   write-only, so the app cannot confirm they applied. This is a property of the
   hardware — see `docs/PROTOCOL.md`.
-- The left/right bit mapping in the ear-detection frame is an assumption, pending
-  confirmation.
+- Per-bud in-ear detection is not available. It is not carried on the AAP L2CAP channel
+  — MagicPods derives it from BLE advertisements, which would need a separate HCI
+  sniffer. The app reports the number of connected buds instead.
 - The driver delivers its push stream to a single client, so only one AAP client can
   be active at a time.

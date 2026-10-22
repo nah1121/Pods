@@ -211,32 +211,41 @@ parsing must stop at the first non-printable byte. Expected order:
 4 "51.9.6"   5 "51.9.6"   6 "1.0.0"   7 "com.apple.accessory.update.app.60-ANC"   ...
 ```
 
-### Ear detection — `cmd 0x06`
-
-Captured frames are 8 bytes:
+### Bud link state — `cmd 0x06` and `cmd 0x08`
 
 ```
-04 00 04 00 06 00 <role> <mask>
+04 00 04 00 06 00 <role> <connected>
+04 00 04 00 08 00 <connected> ...
 ```
 
-Byte 7 is a **bitmask**, not a pair of flags. The values observed are `0x00` (neither
-bud), `0x01` (one bud) and `0x03` (both buds) — `0x02` never appears, which is what you
-would expect from a bitmask when only one bud is worn.
+**These frames report link state, not in-ear detection.** Captured by walking the buds
+through three physical states in sequence:
 
-```
-bit 0 -> left bud      (ASSUMED, not yet confirmed)
-bit 1 -> right bud
-```
+| physical state | `cmd 0x06` | buds connected |
+|---|---|---|
+| both buds in the closed case | `06 00 01 01` | 1 |
+| one bud taken out of the case | `06 00 01 02` | 2 |
+| both buds in the ears | `06 00 02 02` | 2 |
 
-Byte 6 alternates between `0x00` and `0x01`; its meaning is unknown.
+So byte 7 of `cmd 0x06` (and byte 6 of `cmd 0x08`) counts the buds connected to the
+host. Byte 6 of `cmd 0x06` is a primary/secondary index that also moves between 1 and 2.
 
-> **Open question:** the bit-to-bud mapping is a working assumption. It is the one
-> remaining unconfirmed detail in this document. `aapprobe watch` prints the raw frames,
-> so it can be settled with a short sequence — wear both buds, remove one, put it back,
-> remove the other — and reading the mask transitions.
+Note the first row: with both buds in a **closed** case only one of them is connected —
+the case is radio-transparent, so the buds reach the host through each other.
 
-`cmd 0x08` looks superficially similar but is **role/setup** — it does not change as pods
-are moved.
+### In-ear detection is not on this channel
+
+MagicPods shows per-bud "L in / R in" state. That does **not** come from the AAP L2CAP
+channel. In MagicPodsCore, in-ear detection comes from the **BLE advertising** path
+(`PassiveHciBasedBleAdvertisingService`, `AapBatteryType` comment "01 - unknown possible
+AirPods Max only") — that is, from the advertisements the buds broadcast.
+
+Sniffing BLE advertisements needs a separate HCI-level sniffer, which the `MagicAAP`
+driver does not provide. So per-bud in-ear state is **not available** to this app, and
+the UI reports the bud connection count instead of claiming a left/right ear state it
+cannot substantiate.
+
+`aapprobe watch` prints the raw frames if you want to explore further.
 
 ### Others seen
 

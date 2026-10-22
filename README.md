@@ -23,6 +23,7 @@ No licence key, no account, no telemetry, no vendor servers. Just your buds.
 * **Tone volume** and **adaptive audio noise**
 * Live **battery levels** for both buds and the case
 * Live **device identity** (model, serial, firmware)
+* Live **bud connection state**
 * Settings **persist** between launches and are restored on connect
 * A **CLI** for scripting
 

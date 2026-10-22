@@ -35,7 +35,8 @@ try
             if (!Match(mode, f)) continue;
             string hex = Hex.F(f);
             string key = f[4] + ":" + hex;
-            if (mode == "frames" || seen.Add(key))
+            // "watch" prints every frame so transitions are visible; the others dedupe.
+            if (mode == "frames" || mode == "watch" || seen.Add(key))
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] cmd 0x{f[4]:x2} ({f.Length,3} B)  {hex}");
         }
         Thread.Sleep(60);

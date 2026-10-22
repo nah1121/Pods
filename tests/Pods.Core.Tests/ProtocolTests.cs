@@ -202,33 +202,28 @@ public class ProtocolTests
     // ---------------------------------------------------------------- ear / settings
 
     [Fact]
-    public void ParseEar_ReadsTheBitmask()
+    public void ParseBudState_CountsConnectedBuds()
     {
-        // Captured frames are 8 bytes; byte 7 is a bitmask.
-        var none = AapDecoder.ParseEar(Hex("04 00 04 00 06 00 01 00"));
-        Assert.False(none.LeftIn);
-        Assert.False(none.RightIn);
-        Assert.Equal(1, none.Role);
+        // Captured by walking the buds through three physical states.
+        var inCase = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 01 01"));
+        Assert.Equal(1, inCase.Connected);      // both buds in the closed case
+        Assert.Equal(1, inCase.Role);
 
-        var one = AapDecoder.ParseEar(Hex("04 00 04 00 06 00 00 01"));
-        Assert.True(one.LeftIn);
-        Assert.False(one.RightIn);
-        Assert.Equal(0, one.Role);
+        var oneOut = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 01 02"));
+        Assert.Equal(2, oneOut.Connected);      // one bud taken out
+        Assert.Equal(1, oneOut.Role);
 
-        var both = AapDecoder.ParseEar(Hex("04 00 04 00 06 00 00 03"));
-        Assert.True(both.LeftIn);
-        Assert.True(both.RightIn);
-        Assert.Equal(3, both.Mask);
+        var inEars = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 02 02"));
+        Assert.Equal(2, inEars.Connected);      // both buds worn
+        Assert.Equal(2, inEars.Role);
     }
 
     [Fact]
-    public void ParseEar_HandlesShortFrames()
+    public void ParseConnectedFrom08_CountsConnectedBuds()
     {
-        var ear = AapDecoder.ParseEar(Hex("04 00 04 00 06 00"));
-        Assert.Equal(0, ear.Role);
-        Assert.Equal(0, ear.Mask);
-        Assert.False(ear.LeftIn);
-        Assert.False(ear.RightIn);
+        Assert.Equal(1, AapDecoder.ParseConnectedFrom08(Hex("04 00 04 00 08 00 01 00 01 00")));
+        Assert.Equal(2, AapDecoder.ParseConnectedFrom08(Hex("04 00 04 00 08 00 02 00 01 00")));
+        Assert.Equal(-1, AapDecoder.ParseConnectedFrom08(Hex("04 00 04 00 06 00 01 01")));
     }
 
     [Fact]

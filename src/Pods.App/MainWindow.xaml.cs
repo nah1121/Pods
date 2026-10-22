@@ -158,12 +158,16 @@ public partial class MainWindow : Window
 
     void UpdateEar(AapSession s)
     {
-        // cmd 0x06: byte 7 is a bitmask - bit 0 is the left bud, bit 1 the right.
-        if (s.LeftInEar is bool l && s.RightInEar is bool r)
+        // cmd 0x06 / 0x08 report how many buds are connected to the host - this is
+        // link state, not in-ear detection. (In-ear detection is not carried on the
+        // L2CAP channel; MagicPods derives it from BLE advertisements.)
+        if (s.PodsConnected is int n)
         {
-            EarText.Text = $"Ear  L {(l ? "in" : "out")}   R {(r ? "in" : "out")}";
+            EarText.Text = n == 0 ? "No buds connected"
+                     : n == 1 ? "1 bud connected"
+                              : $"{n} buds connected";
             EarText.Foreground = new SolidColorBrush(
-                (Color)ColorConverter.ConvertFromString(l && r ? "#2ECC71" : "#8B95A7"));
+                (Color)ColorConverter.ConvertFromString(n > 0 ? "#8B95A7" : "#F5A524"));
         }
         else
         {
