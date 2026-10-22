@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using Pods.Core;
 
 namespace FrameMonitor;
@@ -40,6 +41,47 @@ public partial class MainWindow : Window
         Loaded += async (_, _) => await ConnectAsync();
         Closing += (_, _) => { AapSession.CaptureAllFrames = false; _session?.Dispose(); };
         LoadMap();
+
+        // Keep the decoded battery / bud-state panel up to date.
+        var timer = new System.Windows.Threading.DispatcherTimer
+        { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) => UpdateLiveState();
+        timer.Start();
+    }
+
+    /// <summary>Render the decoded battery levels and per-bud state.</summary>
+    void UpdateLiveState()
+    {
+        var s = _session;
+        if (s == null) return;
+
+        SetBar(LeftBar, LeftValue, s.LeftBattery, s.LeftStatus, 120);
+        SetBar(RightBar, RightValue, s.RightBattery, s.RightStatus, 120);
+        SetBar(CaseBar, CaseValue, s.CaseBattery, s.CaseStatus, 120);
+
+        var parts = new List<string>();
+        if (s.LeftState is byte l && s.RightState is byte r)
+            parts.Add($"L {AapSession.BudStateName(l)}   R {AapSession.BudStateName(r)}");
+        if (s.InEarCount > 0) parts.Add($"{s.InEarCount} in ear");
+        if (s.OutOfEarCount > 0) parts.Add($"{s.OutOfEarCount} out");
+        if (s.InCaseCount > 0) parts.Add($"{s.InCaseCount} in case");
+        BudStateText.Text = string.Join("   ", parts);
+    }
+
+    static void SetBar(Rectangle bar, TextBlock label, int? pct, string status, double maxWidth)
+    {
+        if (pct is int p)
+        {
+            bar.Width = maxWidth * Math.Clamp(p, 0, 100) / 100.0;
+            bar.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+                status == "charging" ? "#2ECC71" : "#8B95A7"));
+            label.Text = status == "charging" ? $"{p}% charging" : $"{p}%";
+        }
+        else
+        {
+            bar.Width = 0;
+            label.Text = status == "disconnected" ? "in case" : "--";
+        }
     }
 
     static string MapPath => System.IO.Path.Combine(

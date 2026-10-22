@@ -186,17 +186,70 @@ public sealed class AapSession : IDisposable
 
     /// <summary>
     /// How many buds are currently connected over the AAP channel, as reported by
-    /// cmd 0x06 / cmd 0x08. This is link state, not in-ear state.
+    /// cmd 0x08.
     /// </summary>
     public int? PodsConnected { get; private set; }
 
     /// <summary>
-    /// The state of the currently active bud, from cmd 0x06 byte 6:
-    /// 0 = in ear, 1 = out of ear, 2 = in case.
+    /// Work out which bud is which from cmd 0x06.
+    ///
+    /// cmd 0x06 carries the state of the two buds (0 = in ear, 1 = out of ear,
+    /// 2 = in case) but NOT in a fixed order - the device swaps the bytes. cmd 0x04
+    /// identifies the buds explicitly by type and says which one is charging, and a
+    /// bud in the case is the one that charges. So when exactly one bud is in the
+    /// case and exactly one is charging, the mapping is unambiguous.
+    ///
+    /// When it cannot be resolved (one in ear and one out, neither charging) the
+    /// per-side values are left null and only the counts are meaningful.
     /// </summary>
-    public byte? BudState { get; private set; }
+    void ResolveBudStates(byte a, byte b)
+    {
+        InEarCount = (a == 0 ? 1 : 0) + (b == 0 ? 1 : 0);
+        OutOfEarCount = (a == 1 ? 1 : 0) + (b == 1 ? 1 : 0);
+        InCaseCount = (a == 2 ? 1 : 0) + (b == 2 ? 1 : 0);
 
-    /// <summary>Human name for a cmd 0x06 state code.</summary>
+        if (a == b)
+        {
+            // Both buds are in the same state - no ambiguity.
+            RightState = a;
+            LeftState = b;
+            return;
+        }
+
+        bool leftCharging = LeftStatus == "charging";
+        bool rightCharging = RightStatus == "charging";
+
+        if (InCaseCount == 1 && leftCharging != rightCharging)
+        {
+            // The charging bud is the one in the case.
+            byte other = a == 2 ? b : a;
+            if (leftCharging) { LeftState = 2; RightState = other; }
+            else { RightState = 2; LeftState = other; }
+            return;
+        }
+
+        // Truly ambiguous - one in ear and one out, with no case to anchor it.
+        RightState = null;
+        LeftState = null;
+    }
+
+    /// <summary>
+    /// Per-bud state from cmd 0x06: 0 = in ear, 1 = out of ear, 2 = in case.
+    ///
+    /// The two bytes are NOT in a fixed left/right order - the device swaps them
+    /// (observed directly in captured bursts). These are therefore best-effort:
+    /// they are set when the ordering can be resolved, and left null when it
+    /// cannot. Use the counts below, which are always reliable.
+    /// </summary>
+    public byte? RightState { get; private set; }
+    public byte? LeftState { get; private set; }
+
+    /// <summary>How many buds are in an ear / out of an ear / in the case.</summary>
+    public int InEarCount { get; private set; }
+    public int OutOfEarCount { get; private set; }
+    public int InCaseCount { get; private set; }
+
+    /// <summary>Human name for a cmd 0x06 per-bud state code.</summary>
     public static string BudStateName(byte? v) => v switch
     {
         null => "?",
@@ -206,7 +259,7 @@ public sealed class AapSession : IDisposable
         _ => $"({v})"
     };
 
-    /// <summary>Primary/secondary index reported by cmd 0x06.</summary>
+    /// <summary>Primary/secondary index reported by cmd 0x08.</summary>
     public byte? BudRole { get; private set; }
     public string ModelName { get; private set; }
     public string Firmware { get; private set; }
@@ -392,11 +445,11 @@ if (d[4] == 0x08)
 
         if (d[4] == 0x06)
         {
-            // Bud link state: byte 7 counts the buds connected to the host.
+            // Per-bud state. The two bytes are not in a fixed left/right order, so
+            // the per-side mapping is resolved from cmd 0x04's charging status when
+            // possible; the counts are always reliable.
             var buds = AapDecoder.ParseBudState(d);
-            PodsConnected = buds.Connected;
-            BudRole = buds.State;
-            BudState = buds.State;
+            ResolveBudStates(buds.Right, buds.Left);
             InEarChangedAt = DateTime.Now;
         }
     }
@@ -523,7 +576,7 @@ if (d[4] == 0x08)
         else if (d[4] == 0x06)
         {
             var buds = AapDecoder.ParseBudState(d);
-            yield return $"bud state state={buds.State} connected={buds.Connected}";
+            yield return $"bud state R={buds.Right} L={buds.Left}";
         }
         else if (d[4] == 0x08)
         {

@@ -106,21 +106,26 @@ public partial class MainWindow : Window
         SetGauge(RightBatteryFill, RightBatteryText, s.RightBattery, s.RightStatus, quiet);
 
         // The case reports "disconnected" when it is empty (no pods in it), which is
-        // not the same as "not charging" - so only show a case reading when the
-        // device actually reports the case as present.
-        if (s.CaseStatus is string cs && cs != "disconnected")
+        // not the same as "not charging" - show a dash rather than a fake 0%.
+        bool casePresent = s.CaseStatus is string cs && cs != "disconnected";
+        if (casePresent)
         {
-            CaseText.Text = $"Case {s.CaseBattery}%{(cs == "charging" ? " charging" : "")}";
-            CaseText.Visibility = Visibility.Visible;
+            CaseText.Text = s.CaseBattery is int c
+                ? $"C {c}%{(s.CaseStatus == "charging" ? " charging" : "")}"
+                : "C --";
         }
         else
         {
-            CaseText.Visibility = Visibility.Collapsed;
+            CaseText.Text = "C --";
         }
+        CaseText.Foreground = new SolidColorBrush(
+            (Color)ColorConverter.ConvertFromString(casePresent ? "#8B95A7" : "#5C6678"));
 
-        FooterHint.Text = quiet
-            ? $"Last update {stale}s ago - buds report about every minute"
-            : $"{s.FrameCount} frames received";
+        FooterHint.Text = s.LastBatteryAt is null
+            ? "Waiting for the first battery reading - the buds only report while active"
+            : quiet
+              ? $"Last update {stale}s ago - buds report about every minute"
+              : $"{s.FrameCount} frames received";
     }
 
     static void SetGauge(Rectangle fill, TextBlock label, int? pct, string status, bool quiet)
@@ -153,7 +158,7 @@ public partial class MainWindow : Window
         else
         {
             fill.Width = 0;
-            label.Text = "--";
+            label.Text = status == "disconnected" ? "in case" : "--";
             label.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5C6678"));
         }
     }
@@ -171,21 +176,22 @@ public partial class MainWindow : Window
 
     void UpdateEar(AapSession s)
     {
-        // cmd 0x06 reports the state of the active bud (0 = in ear, 1 = out of ear,
-        // 2 = in case) and how many buds are connected.
-        if (s.PodsConnected is int n)
+        // cmd 0x06 carries the state of both buds, but not in a fixed left/right
+        // order. The counts are always reliable; the per-side names only when the
+        // mapping could be resolved.
+        var parts = new List<string>();
+        if (s.InEarCount > 0) parts.Add($"{s.InEarCount} in ear");
+        if (s.OutOfEarCount > 0) parts.Add($"{s.OutOfEarCount} out");
+        if (s.InCaseCount > 0) parts.Add($"{s.InCaseCount} in case");
+
+        if (s.LeftState is byte l && s.RightState is byte r)
         {
-            string state = s.BudState is byte b ? AapSession.BudStateName(b) : "";
-            EarText.Text = state.Length > 0
-                ? $"{state}   ({n} connected)"
-                : n == 0 ? "No buds connected" : $"{n} buds connected";
-            EarText.Foreground = new SolidColorBrush(
-                (Color)ColorConverter.ConvertFromString(n > 0 ? "#8B95A7" : "#F5A524"));
+            parts.Insert(0, $"L {AapSession.BudStateName(l)}  R {AapSession.BudStateName(r)}");
         }
-        else
-        {
-            EarText.Text = "";
-        }
+
+        EarText.Text = parts.Count > 0 ? string.Join("   ", parts) : "";
+        EarText.Foreground = new SolidColorBrush(
+            (Color)ColorConverter.ConvertFromString(s.InEarCount == 2 ? "#2ECC71" : "#8B95A7"));
     }
 
     /// <summary>Reflect the device-confirmed state on the controls.</summary>

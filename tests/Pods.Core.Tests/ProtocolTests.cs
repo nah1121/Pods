@@ -202,20 +202,33 @@ public class ProtocolTests
     // ---------------------------------------------------------------- ear / settings
 
     [Fact]
-    public void ParseBudState_ReadsStateAndConnectedCount()
+    public void ParseBudState_ReadsPerBudState()
     {
         // Identified by tagging frames live while moving the buds.
-        var outOfEar = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 01 02"));
-        Assert.Equal(0x01, outOfEar.State);     // out of ear
-        Assert.Equal(2, outOfEar.Connected);
+        // byte 6 = right bud, byte 7 = left bud; 0 = in ear, 1 = out of ear, 2 = in case.
+        var bothIn = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 00 00"));
+        Assert.Equal(0x00, bothIn.Right);
+        Assert.Equal(0x00, bothIn.Left);
 
-        var inEar = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 00 02"));
-        Assert.Equal(0x00, inEar.State);        // in ear
-        Assert.Equal(2, inEar.Connected);
+        var oneIn = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 00 01"));
+        Assert.Equal(0x00, oneIn.Right);        // right in ear
+        Assert.Equal(0x01, oneIn.Left);         // left out of ear
 
-        var inCase = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 02 02"));
-        Assert.Equal(0x02, inCase.State);       // in case
-        Assert.Equal(2, inCase.Connected);
+        var bothOut = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 01 01"));
+        Assert.Equal(0x01, bothOut.Right);
+        Assert.Equal(0x01, bothOut.Left);
+
+        var rightOut = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 01 02"));
+        Assert.Equal(0x01, rightOut.Right);     // right out of ear
+        Assert.Equal(0x02, rightOut.Left);      // left in case
+
+        var rightIn = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 00 02"));
+        Assert.Equal(0x00, rightIn.Right);      // right in ear
+        Assert.Equal(0x02, rightIn.Left);       // left in case
+
+        var bothCase = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 02 02"));
+        Assert.Equal(0x02, bothCase.Right);
+        Assert.Equal(0x02, bothCase.Left);
     }
 
     [Fact]

@@ -67,8 +67,8 @@
                         <TextBlock x:Name="RightBatteryText" Text="--" Style="{StaticResource Dim}"
                                    VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="58"/>
                     </StackPanel>
-                    <TextBlock x:Name="CaseText" Text="" Style="{StaticResource Dim}" VerticalAlignment="Center"
-                               Visibility="Collapsed" MinWidth="70"/>
+                    <TextBlock x:Name="CaseText" Text="C --" Style="{StaticResource Dim}" VerticalAlignment="Center"
+                               MinWidth="86" Margin="0,0,8,0"/>
                 </StackPanel>
 
                 <!-- Identity + ear detection -->

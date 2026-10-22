@@ -129,31 +129,33 @@ public static class AapDecoder
         _ => "unknown"
     };
 
-    /// <summary>Bud link state reported by cmd 0x06 / cmd 0x08.</summary>
-    /// <param name="Role">Byte 6 of cmd 0x06 - 1 or 2, a primary/secondary index.</param>
-    /// <param name="Connected">How many buds are connected to the host.</param>
-    public readonly record struct BudState(byte State, int Connected);
+    /// <summary>Per-bud state reported by cmd 0x06.</summary>
+    /// <param name="Right">Right bud: 0 = in ear, 1 = out of ear, 2 = in case.</param>
+    /// <param name="Left">Left bud: the same encoding.</param>
+    public readonly record struct BudState(byte Right, byte Left);
 
     /// <summary>
-    /// Parse the bud link state from a cmd 0x06 frame.
+    /// Parse the per-bud state from a cmd 0x06 frame.
     ///
-    ///   04 00 04 00 06 00 &lt;role&gt; &lt;connected&gt;
+    ///   04 00 04 00 06 00 &lt;right&gt; &lt;left&gt;
     ///
-    /// Verified by capturing three physical states in sequence:
+    /// Both bytes are a per-bud state enum (0 = in ear, 1 = out of ear, 2 = in
+    /// case). Identified by tagging frames live in the frame monitor while moving
+    /// the buds:
     ///
-    ///   both buds in the closed case  ->  06 00 01 01   (1 connected)
-    ///   one bud taken out of the case ->  06 00 01 02   (2 connected)
-    ///   both buds in the ears         ->  06 00 02 02   (2 connected)
-    ///
-    /// So byte 7 counts the buds connected to the host. This is link state - it is
-    /// NOT in-ear detection. See docs/PROTOCOL.md.
+    ///   06 00 00 00   both in ear
+    ///   06 00 00 01   right in ear, left out of ear
+    ///   06 00 01 01   both out of ear
+    ///   06 00 01 02   right out of ear, left in case
+    ///   06 00 00 02   right in ear, left in case
+    ///   06 00 02 02   both in case
     /// </summary>
     public static BudState ParseBudState(byte[] d)
     {
         if (d == null || d.Length < 6 || d[4] != 0x06) return default;
-        byte state = d.Length >= 7 ? d[6] : (byte)0;
-        int connected = d.Length >= 8 ? d[7] : 0;
-        return new BudState(state, connected);
+        byte right = d.Length >= 7 ? d[6] : (byte)0;
+        byte left = d.Length >= 8 ? d[7] : (byte)0;
+        return new BudState(right, left);
     }
 
     /// <summary>
