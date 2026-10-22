@@ -24,7 +24,7 @@ public partial class MainWindow : Window
     readonly List<(string Key, string Label)> _map = new();
     readonly HashSet<string> _seen = new(StringComparer.Ordinal);
 
-    string _lastNewKey;
+    string _lastKey;
     string _filter = "";
 
     public MainWindow()
@@ -106,7 +106,9 @@ public partial class MainWindow : Window
 
                 Dispatcher.Invoke(() =>
                 {
-                    if (isNew) _lastNewKey = key;
+                    // Track the most recent frame of any kind, so "Tag last frame"
+                    // always tags what just arrived - not the last unseen code.
+                    _lastKey = key;
                     _pending.Enqueue(line);
                 });
                 AppendLog(line);
@@ -131,8 +133,8 @@ public partial class MainWindow : Window
         if (added > 0) FrameList.ScrollIntoView(FrameList.Items[^1]);
 
         FrameCount.Text = FrameList.Items.Count.ToString();
-        if (_lastNewKey != null)
-            LastFrame.Text = "last new: " + _lastNewKey;
+        if (_lastKey != null)
+            LastFrame.Text = "last frame: " + _lastKey;
     }
 
     static string KeyOf(byte[] f) =>
@@ -155,7 +157,7 @@ public partial class MainWindow : Window
     {
         FrameList.Items.Clear();
         _seen.Clear();
-        _lastNewKey = null;
+        _lastKey = null;
     }
 
     /// <summary>Write a timestamped marker into the log, e.g. "right pod in ear".</summary>
@@ -189,18 +191,19 @@ public partial class MainWindow : Window
 
     void Tag_Click(object sender, RoutedEventArgs e)
     {
-        if (_lastNewKey == null)
+        if (_lastKey == null)
         {
-            MapBox.Text = "Nothing new to tag yet - wait for a frame marked <new>.";
+            MapBox.Text = "No frames have arrived yet.";
             return;
         }
         string label = LabelBox.Text.Trim();
         if (label.Length == 0) return;
 
-        _map.RemoveAll(m => m.Key == _lastNewKey);
-        _map.Add((_lastNewKey, label));
+        _map.RemoveAll(m => m.Key == _lastKey);
+        _map.Add((_lastKey, label));
         LabelBox.Clear();
         RenderMap();
+        FooterHint.Text = "Tagged: " + _lastKey;
     }
 
     void Undo_Click(object sender, RoutedEventArgs e)
