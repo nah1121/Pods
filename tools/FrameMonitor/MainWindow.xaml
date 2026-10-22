@@ -31,7 +31,8 @@
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="Pause" Content="Pause" Style="{StaticResource GhostButton}" Click="Pause_Click" Margin="0,0,8,0"/>
-                <Button Content="Clear" Style="{StaticResource GhostButton}" Click="Clear_Click"/>
+                <Button Content="Clear" Style="{StaticResource GhostButton}" Click="Clear_Click" Margin="0,0,8,0"/>
+                <Button Content="Open log" Style="{StaticResource GhostButton}" Click="OpenLog_Click"/>
             </StackPanel>
         </Grid>
 
@@ -104,6 +105,16 @@
                                     Click="Tag_Click" Padding="12,6" MinWidth="0"/>
                             <Button Content="Undo" Style="{StaticResource GhostButton}"
                                     Click="Undo_Click" Padding="12,6" MinWidth="0" Margin="8,0,0,0"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0"
+                                   Text="Mark writes a timestamped note into the log so a physical state can be lined up with the frames around it."/>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <TextBox x:Name="MarkBox" Height="26" FontSize="12" Width="170"
+                                     Background="{StaticResource BgBrush}" Foreground="{StaticResource TextBrush}"
+                                     BorderBrush="{StaticResource BorderHiBrush}" Padding="8,3"
+                                     KeyDown="MarkBox_KeyDown"/>
+                            <Button Content="Mark" Style="{StaticResource GhostButton}"
+                                    Click="Mark_Click" Padding="12,5" MinWidth="0" Margin="8,0,0,0"/>
                         </StackPanel>
                     </StackPanel>
 

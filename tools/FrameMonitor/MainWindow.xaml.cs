@@ -39,6 +39,30 @@ public partial class MainWindow : Window
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "PodsClone", "frame-map.json");
 
+    /// <summary>
+    /// Every frame is appended here as it arrives, so a session can be analysed
+    /// afterwards. "Mark" writes a timestamped note into the same file, which is
+    /// what lets a physical state be lined up with the frames around it.
+    /// </summary>
+    static string LogPath => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "PodsClone", "frame-log.txt");
+
+    static readonly object LogLock = new();
+
+    static void AppendLog(string line)
+    {
+        try
+        {
+            lock (LogLock)
+            {
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(LogPath));
+                File.AppendAllText(LogPath, line + Environment.NewLine);
+            }
+        }
+        catch { }
+    }
+
     async Task ConnectAsync()
     {
         StatusText.Text = "Connecting...";
@@ -85,6 +109,7 @@ public partial class MainWindow : Window
                     if (isNew) _lastNewKey = key;
                     _pending.Enqueue(line);
                 });
+                AppendLog(line);
             }
             if (any) Dispatcher.Invoke(Flush);
             Thread.Sleep(60);
@@ -131,6 +156,35 @@ public partial class MainWindow : Window
         FrameList.Items.Clear();
         _seen.Clear();
         _lastNewKey = null;
+    }
+
+    /// <summary>Write a timestamped marker into the log, e.g. "right pod in ear".</summary>
+    void Mark_Click(object sender, RoutedEventArgs e)
+    {
+        string note = MarkBox.Text.Trim();
+        if (note.Length == 0) note = "(no note)";
+        string line = $"=== MARK [{DateTime.Now:HH:mm:ss.fff}] {note} ===";
+        AppendLog(line);
+        _pending.Enqueue(line);
+        Flush();
+        MarkBox.Clear();
+        FooterHint.Text = "Marked: " + note;
+    }
+
+    void MarkBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) Mark_Click(sender, e);
+    }
+
+    void OpenLog_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!File.Exists(LogPath)) { FooterHint.Text = "No log yet."; return; }
+            System.Diagnostics.Process.Start("notepad.exe", LogPath);
+            FooterHint.Text = "Opened " + LogPath;
+        }
+        catch (Exception ex) { FooterHint.Text = "Could not open log: " + ex.Message; }
     }
 
     void Tag_Click(object sender, RoutedEventArgs e)
