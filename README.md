@@ -1,11 +1,12 @@
-# Pods
+<div align="center">
+  <img src="src/Pods.App/Assets/icon.png" width="128" alt="Pods">
+  <h1>Pods</h1>
+</div>
 
 A free, open-source control app for Airoha-clone AirPods (AirPods Pro, AirPods Pro 2,
 AirPods 3, …) on Windows 11.
 
 No licence key, no account, no telemetry, no vendor servers. Just your buds.
-
-<!-- Screenshots: docs/screenshot.png -->
 
 ![screenshot](docs/screenshot.png)
 
@@ -128,8 +129,21 @@ src/Pods.Core     protocol, transport, device session
 src/Pods.App      WPF desktop app
 src/Pods.Cli      command-line interface
 tools/AapProbe    protocol debugger
+tests/            unit tests for the protocol layer
 docs/             protocol and driver notes
 ```
+
+### Development
+
+```powershell
+dotnet build
+dotnet test
+dotnet run --project src/Pods.App
+```
+
+The protocol layer is fully covered by unit tests that run without any hardware
+attached — packet layouts are asserted byte-for-byte against the reference
+implementation, and the frame decoders are tested against captured byte sequences.
 
 ---
 
