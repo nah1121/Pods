@@ -169,6 +169,9 @@ it in their own source — `AapConversationAwarenessCapability.cpp`,
 Each block: `[0]` type, `[1]` unused, `[2]` level 0–100, `[3]` charging status,
 `[4]` unused.
 
+**The block order is not fixed** — the left and right blocks swap between frames, so the
+type byte must be used to identify each block.
+
 | type | |
 |---|---|
 | `0x01` | single (AirPods Max) |
@@ -181,7 +184,18 @@ Each block: `[0]` type, `[1]` unused, `[2]` level 0–100, `[3]` charging status
 | `0x00` | undefined |
 | `0x01` | charging |
 | `0x02` | not charging |
-| `0x04` | disconnected — the bud is in its case and has stopped reporting |
+| `0x04` | disconnected — the case is empty, or the bud is in a closed case |
+
+The status byte is what tells you a pod is charging *because it is in the case*:
+
+```
+right 99 not-charging   left 96 charging   case 79 not-charging   <- left pod in the case
+right 98 not-charging   left 98 charging   case 79 not-charging   <- both in the case
+right 98 charging       left 98 charging   case 79 not-charging   <- right starts charging
+```
+
+So: a pod reporting `0x01` is in the case and charging; the case itself reports `0x04`
+when it is empty, `0x02` when present but idle, and `0x01` when charging.
 
 Two quirks on clone hardware:
 
@@ -211,39 +225,47 @@ parsing must stop at the first non-printable byte. Expected order:
 4 "51.9.6"   5 "51.9.6"   6 "1.0.0"   7 "com.apple.accessory.update.app.60-ANC"   ...
 ```
 
-### Bud link state — `cmd 0x06` and `cmd 0x08`
+### Bud state — `cmd 0x06` and `cmd 0x08`
 
 ```
-04 00 04 00 06 00 <role> <connected>
-04 00 04 00 08 00 <connected> ...
+04 00 04 00 06 00 <state> <connected>
+04 00 04 00 08 00 <state> <state> ...
 ```
 
-**These frames report link state, not in-ear detection.** Captured by walking the buds
-through three physical states in sequence:
+**`cmd 0x06` byte 6 is a state code, byte 7 is the number of buds connected.**
 
-| physical state | `cmd 0x06` | buds connected |
-|---|---|---|
-| both buds in the closed case | `06 00 01 01` | 1 |
-| one bud taken out of the case | `06 00 01 02` | 2 |
-| both buds in the ears | `06 00 02 02` | 2 |
+| byte 6 | meaning |
+|---|---|
+| `0x00` | in ear |
+| `0x01` | out of ear |
+| `0x02` | in case |
 
-So byte 7 of `cmd 0x06` (and byte 6 of `cmd 0x08`) counts the buds connected to the
-host. Byte 6 of `cmd 0x06` is a primary/secondary index that also moves between 1 and 2.
+Identified by tagging frames live in the frame monitor while moving the buds:
 
-Note the first row: with both buds in a **closed** case only one of them is connected —
-the case is radio-transparent, so the buds reach the host through each other.
+| observed | meaning |
+|---|---|
+| `06 00 01 02` | the connected bud is **out of ear** |
+| `06 00 00 02` | the connected bud is **in ear** |
+| `06 00 02 02` | **both in case** |
 
-### In-ear detection is not on this channel
+Note the "connected" byte stays at 2 in every one of those, so it is a count rather than
+a per-bud flag. When only one bud is connected the frame still reports the state of that
+bud.
 
-MagicPods shows per-bud "L in / R in" state. That does **not** come from the AAP L2CAP
-channel. In MagicPodsCore, in-ear detection comes from the **BLE advertising** path
-(`PassiveHciBasedBleAdvertisingService`, `AapBatteryType` comment "01 - unknown possible
-AirPods Max only") — that is, from the advertisements the buds broadcast.
+`cmd 0x08` carries two state bytes that swap position between frames
+(`08 00 02 00 01 00` / `08 00 00 02 00 00`), which looks like per-bud values delivered in
+alternating order. Its exact layout is still open.
+
+### In-ear detection per bud
+
+MagicPods shows a separate "L in / R in" for each bud. The AAP channel does not carry
+that: `cmd 0x06` reports the state of the bud that is currently active, not both. In
+MagicPodsCore, per-bud in-ear state comes from the **BLE advertising** path
+(`PassiveHciBasedBleAdvertisingService`) — the advertisements the buds broadcast.
 
 Sniffing BLE advertisements needs a separate HCI-level sniffer, which the `MagicAAP`
-driver does not provide. So per-bud in-ear state is **not available** to this app, and
-the UI reports the bud connection count instead of claiming a left/right ear state it
-cannot substantiate.
+driver does not provide. So per-bud in-ear state is not available here, and the app
+reports what the channel does carry.
 
 `aapprobe watch` prints the raw frames if you want to explore further.
 

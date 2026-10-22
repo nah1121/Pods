@@ -132,7 +132,7 @@ public static class AapDecoder
     /// <summary>Bud link state reported by cmd 0x06 / cmd 0x08.</summary>
     /// <param name="Role">Byte 6 of cmd 0x06 - 1 or 2, a primary/secondary index.</param>
     /// <param name="Connected">How many buds are connected to the host.</param>
-    public readonly record struct BudState(byte Role, int Connected);
+    public readonly record struct BudState(byte State, int Connected);
 
     /// <summary>
     /// Parse the bud link state from a cmd 0x06 frame.
@@ -151,9 +151,9 @@ public static class AapDecoder
     public static BudState ParseBudState(byte[] d)
     {
         if (d == null || d.Length < 6 || d[4] != 0x06) return default;
-        byte role = d.Length >= 7 ? d[6] : (byte)0;
+        byte state = d.Length >= 7 ? d[6] : (byte)0;
         int connected = d.Length >= 8 ? d[7] : 0;
-        return new BudState(role, connected);
+        return new BudState(state, connected);
     }
 
     /// <summary>

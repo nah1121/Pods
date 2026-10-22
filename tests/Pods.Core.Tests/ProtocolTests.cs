@@ -202,20 +202,20 @@ public class ProtocolTests
     // ---------------------------------------------------------------- ear / settings
 
     [Fact]
-    public void ParseBudState_CountsConnectedBuds()
+    public void ParseBudState_ReadsStateAndConnectedCount()
     {
-        // Captured by walking the buds through three physical states.
-        var inCase = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 01 01"));
-        Assert.Equal(1, inCase.Connected);      // both buds in the closed case
-        Assert.Equal(1, inCase.Role);
+        // Identified by tagging frames live while moving the buds.
+        var outOfEar = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 01 02"));
+        Assert.Equal(0x01, outOfEar.State);     // out of ear
+        Assert.Equal(2, outOfEar.Connected);
 
-        var oneOut = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 01 02"));
-        Assert.Equal(2, oneOut.Connected);      // one bud taken out
-        Assert.Equal(1, oneOut.Role);
+        var inEar = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 00 02"));
+        Assert.Equal(0x00, inEar.State);        // in ear
+        Assert.Equal(2, inEar.Connected);
 
-        var inEars = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 02 02"));
-        Assert.Equal(2, inEars.Connected);      // both buds worn
-        Assert.Equal(2, inEars.Role);
+        var inCase = AapDecoder.ParseBudState(Hex("04 00 04 00 06 00 02 02"));
+        Assert.Equal(0x02, inCase.State);       // in case
+        Assert.Equal(2, inCase.Connected);
     }
 
     [Fact]

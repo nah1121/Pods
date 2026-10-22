@@ -121,7 +121,23 @@ public partial class MainWindow : Window
                 });
                 AppendLog(line);
             }
-            if (any) Dispatcher.Invoke(Flush);
+            if (any)
+            {
+                _lastFrameAt = DateTime.Now;
+                Dispatcher.Invoke(Flush);
+            }
+            else
+            {
+                // The AirPods dropping off Bluetooth leaves the driver's read blocked
+                // forever, so the feed just stops. Reconnect on our own initiative.
+                int quiet = (int)(DateTime.Now - _lastFrameAt).TotalSeconds;
+                if (quiet > 25 && !_reconnecting && _autoReconnects < 10)
+                {
+                    _autoReconnects++;
+                    Dispatcher.Invoke(() => StatusText.Text = $"No frames for {quiet}s - reconnecting...");
+                    Dispatcher.Invoke(() => Reconnect_Click(this, null));
+                }
+            }
             Thread.Sleep(60);
         }
     }
@@ -202,6 +218,45 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) { FooterHint.Text = "Could not open log: " + ex.Message; }
     }
+
+    // ---- reconnect ---------------------------------------------------------
+
+    DateTime _lastFrameAt = DateTime.Now;
+    int _autoReconnects;
+
+    /// <summary>
+    /// Reconnect to the driver. Needed when the AirPods drop off and come back:
+    /// Windows creates a new BTHENUM instance, so the old device path is dead and
+    /// the blocked read never returns.
+    /// </summary>
+    async void Reconnect_Click(object sender, RoutedEventArgs e)
+    {
+        if (_reconnecting) return;
+        _reconnecting = true;
+        try
+        {
+            StatusText.Text = "Reconnecting...";
+            if (_session == null)
+            {
+                await ConnectAsync();
+            }
+            else
+            {
+                await Task.Run(() => _session.Reconnect());
+                _lastFrameAt = DateTime.Now;
+                StatusText.Text = "Connected - live";
+            }
+            FooterHint.Text = "Reconnected.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "Reconnect failed: " + ex.Message;
+            FooterHint.Text = ex.Message;
+        }
+        finally { _reconnecting = false; }
+    }
+
+    bool _reconnecting;
 
     void TagSelected_Click(object sender, RoutedEventArgs e)
     {

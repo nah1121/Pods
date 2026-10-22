@@ -105,6 +105,19 @@ public partial class MainWindow : Window
         SetGauge(LeftBatteryFill, LeftBatteryText, s.LeftBattery, s.LeftStatus, quiet);
         SetGauge(RightBatteryFill, RightBatteryText, s.RightBattery, s.RightStatus, quiet);
 
+        // The case reports "disconnected" when it is empty (no pods in it), which is
+        // not the same as "not charging" - so only show a case reading when the
+        // device actually reports the case as present.
+        if (s.CaseStatus is string cs && cs != "disconnected")
+        {
+            CaseText.Text = $"Case {s.CaseBattery}%{(cs == "charging" ? " charging" : "")}";
+            CaseText.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            CaseText.Visibility = Visibility.Collapsed;
+        }
+
         FooterHint.Text = quiet
             ? $"Last update {stale}s ago - buds report about every minute"
             : $"{s.FrameCount} frames received";
@@ -158,14 +171,14 @@ public partial class MainWindow : Window
 
     void UpdateEar(AapSession s)
     {
-        // cmd 0x06 / 0x08 report how many buds are connected to the host - this is
-        // link state, not in-ear detection. (In-ear detection is not carried on the
-        // L2CAP channel; MagicPods derives it from BLE advertisements.)
+        // cmd 0x06 reports the state of the active bud (0 = in ear, 1 = out of ear,
+        // 2 = in case) and how many buds are connected.
         if (s.PodsConnected is int n)
         {
-            EarText.Text = n == 0 ? "No buds connected"
-                     : n == 1 ? "1 bud connected"
-                              : $"{n} buds connected";
+            string state = s.BudState is byte b ? AapSession.BudStateName(b) : "";
+            EarText.Text = state.Length > 0
+                ? $"{state}   ({n} connected)"
+                : n == 0 ? "No buds connected" : $"{n} buds connected";
             EarText.Foreground = new SolidColorBrush(
                 (Color)ColorConverter.ConvertFromString(n > 0 ? "#8B95A7" : "#F5A524"));
         }
@@ -385,7 +398,10 @@ public partial class MainWindow : Window
 
     private async void Reconnect_Click(object sender, RoutedEventArgs e) => await ConnectAsync();
 
-    /// <summary>Force an immediate state refresh by reconnecting the device.</summary>
+    /// <summary>
+    /// Force an immediate state refresh. Re-opens the device, which is what makes the
+    /// AirPods re-dump their state.
+    /// </summary>
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
         if (_session == null || !await _busy.WaitAsync(0)) return;
@@ -396,6 +412,28 @@ public partial class MainWindow : Window
             Log("Refresh requested.");
         }
         catch (Exception ex) { Log("Refresh failed: " + ex.Message); }
+        finally { SetBusy(false); _busy.Release(); }
+    }
+
+    /// <summary>
+    /// Full reconnect. Needed when the AirPods drop off and come back - Windows
+    /// creates a new BTHENUM instance then, so the old device path is dead.
+    /// </summary>
+    private async void ReconnectDevice_Click(object sender, RoutedEventArgs e)
+    {
+        if (_session == null || !await _busy.WaitAsync(0)) return;
+        SetBusy(true);
+        try
+        {
+            await Task.Run(() => _session.Reconnect());
+            Log("Reconnected to the AirPods.");
+            SetStatus("Connected", true);
+        }
+        catch (Exception ex)
+        {
+            Log("Reconnect failed: " + ex.Message);
+            SetStatus("Not connected", false);
+        }
         finally { SetBusy(false); _busy.Release(); }
     }
 

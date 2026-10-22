@@ -67,6 +67,8 @@
                         <TextBlock x:Name="RightBatteryText" Text="--" Style="{StaticResource Dim}"
                                    VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="58"/>
                     </StackPanel>
+                    <TextBlock x:Name="CaseText" Text="" Style="{StaticResource Dim}" VerticalAlignment="Center"
+                               Visibility="Collapsed" MinWidth="70"/>
                 </StackPanel>
 
                 <!-- Identity + ear detection -->
@@ -271,7 +273,7 @@
                                 <Button Content="Refresh" Style="{StaticResource GhostButton}"
                                         Padding="12,5" MinWidth="0" Click="Refresh_Click"/>
                                 <Button Content="Reconnect" Style="{StaticResource GhostButton}"
-                                        Padding="12,5" MinWidth="0" Margin="8,0,0,0" Click="Reconnect_Click"/>
+                                        Padding="12,5" MinWidth="0" Margin="8,0,0,0" Click="ReconnectDevice_Click"/>
                                 <Button Content="Clear" Style="{StaticResource GhostButton}"
                                         Padding="12,5" MinWidth="0" Margin="8,0,0,0" Click="ClearLog_Click"/>
                             </StackPanel>

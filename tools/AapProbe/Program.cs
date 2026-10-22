@@ -2,12 +2,13 @@ using Pods.Core;
 
 // AapProbe - a protocol debugging tool.
 //
-//   aapprobe frames [seconds]   print every inbound frame with a timestamp
-//   aapprobe watch  [seconds]   print only ear-detection / role frames
-//   aapprobe battery [seconds]  print only battery frames
-//   aapprobe settings [seconds] print only settings (cmd 0x09) frames
+//   aapprobe frames   [seconds]   print every inbound frame
+//   aapprobe watch    [seconds]   bud-state frames only
+//   aapprobe battery  [seconds]   battery frames only
+//   aapprobe settings [seconds]   settings frames only
+//   aapprobe reconnect            open, receive, reconnect, receive again
 //
-// Useful when working out frame layouts, or when checking whether the driver is
+// Useful when working out frame layouts, or when checking that the driver is
 // actually delivering the push stream to this client.
 
 if (args.Length == 0) { Usage(); return 1; }
@@ -18,12 +19,28 @@ int seconds = args.Length > 1 ? int.Parse(args[1]) : 60;
 try
 {
     using var s = AapSession.Connect();
-    s.Log += l => { };
+    s.Log += l => Console.WriteLine(l);
+
+    if (mode == "reconnect")
+    {
+        Console.WriteLine("=== first session ===");
+        s.Handshake();
+        s.StartReceiving();
+        await Task.Delay(6000);
+        Console.WriteLine($"frames after first session: {s.FrameCount}");
+
+        Console.WriteLine("\n=== reconnecting (device path is re-enumerated) ===");
+        s.Reconnect();
+        await Task.Delay(6000);
+        Console.WriteLine($"frames after reconnect: {s.FrameCount}");
+        Console.WriteLine($"path: {s.DevicePath}");
+        Console.WriteLine($"battery: L={s.LeftBattery} R={s.RightBattery} case={s.CaseBattery}");
+        return 0;
+    }
 
     var sw = System.Diagnostics.Stopwatch.StartNew();
     s.Handshake();
     s.StartReceiving();
-
     Console.WriteLine($"aapprobe {mode} - listening {seconds}s from {DateTime.Now:HH:mm:ss}");
     Console.WriteLine("(move the AirPods - wear them for live data)\n");
 
@@ -35,8 +52,7 @@ try
             if (!Match(mode, f)) continue;
             string hex = Hex.F(f);
             string key = f[4] + ":" + hex;
-            // "watch" prints every frame so transitions are visible; the others dedupe.
-            if (mode == "frames" || mode == "watch" || seen.Add(key))
+            if (mode == "frames" || seen.Add(key))
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] cmd 0x{f[4]:x2} ({f.Length,3} B)  {hex}");
         }
         Thread.Sleep(60);
@@ -79,8 +95,9 @@ static void Usage()
 
         USAGE
           aapprobe frames   [seconds]   every inbound frame
-          aapprobe watch    [seconds]   ear-detection and role frames only
+          aapprobe watch    [seconds]   bud-state frames only
           aapprobe battery  [seconds]   battery frames only
           aapprobe settings [seconds]   settings frames only
+          aapprobe reconnect            test the reconnect path
         """);
 }

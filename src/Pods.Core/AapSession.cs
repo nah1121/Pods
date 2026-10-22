@@ -19,7 +19,7 @@ public sealed class AapSession : IDisposable
     public const int SettleMs = 2000;
 
     AapTransport _t;
-    public string DevicePath { get; }
+    public string DevicePath { get; private set; }
 
     public event Action<string> Log;
 
@@ -190,6 +190,22 @@ public sealed class AapSession : IDisposable
     /// </summary>
     public int? PodsConnected { get; private set; }
 
+    /// <summary>
+    /// The state of the currently active bud, from cmd 0x06 byte 6:
+    /// 0 = in ear, 1 = out of ear, 2 = in case.
+    /// </summary>
+    public byte? BudState { get; private set; }
+
+    /// <summary>Human name for a cmd 0x06 state code.</summary>
+    public static string BudStateName(byte? v) => v switch
+    {
+        null => "?",
+        0x00 => "in ear",
+        0x01 => "out of ear",
+        0x02 => "in case",
+        _ => $"({v})"
+    };
+
     /// <summary>Primary/secondary index reported by cmd 0x06.</summary>
     public byte? BudRole { get; private set; }
     public string ModelName { get; private set; }
@@ -227,18 +243,52 @@ public sealed class AapSession : IDisposable
     public void RefreshState()
     {
         // Replaying the handshake on an ESTABLISHED session does NOT make the buds
-        // re-dump their state - only a genuinely fresh session does. So drop the device
-        // handle entirely and re-open it, which is what forces the full state dump.
+        // re-dump their state - only a genuinely fresh session does. Reconnect()
+        // does that, and re-enumerates the device path so it also works after the
+        // AirPods have dropped off and come back.
+        Reconnect();
+        Say("Device state dumped.");
+    }
+
+    /// <summary>
+    /// Full reconnect. Used when the AirPods drop off and come back.
+    ///
+    /// The device path is re-enumerated rather than reused: when the buds
+    /// disconnect, Windows creates a NEW BTHENUM instance (the "...&amp;0" suffix
+    /// changes), so the old path no longer exists and opening it fails.
+    /// </summary>
+    public void Reconnect()
+    {
+        Say("Reconnecting...");
+        DevicePath = null;
         StopReceiving();
         Thread.Sleep(200);
-        _t.Dispose();
+
+        try { _t.Dispose(); } catch { }
         Thread.Sleep(400);
-        _t = AapTransport.Open(DevicePath);
-        Thread.Sleep(200);
+
+        // The path may have changed - look it up again.
+        var paths = AapTransport.FindDevicePaths();
+        string path = null;
+        foreach (var p in paths)
+        {
+            try { _t = AapTransport.Open(p); path = p; break; }
+            catch (Win32Exception) { }
+        }
+        if (path == null)
+        {
+            throw new InvalidOperationException(
+                "The MagicAAP device interface is not available. The AirPods must be "
+                + "connected and awake - check that the MagicAAP driver is running.");
+        }
+        if (path != DevicePath) Say($"Device path changed to {path}");
+        DevicePath = path;
+
+        Thread.Sleep(300);
         Handshake();
-        Thread.Sleep(600);
+        Thread.Sleep(400);
         StartReceiving();
-        Say("Reconnected; device state dumped.");
+        Say("Reconnected.");
     }
 
     /// <summary>Pause the receive loop so a write can take the (synchronous) queue.</summary>
@@ -345,7 +395,8 @@ if (d[4] == 0x08)
             // Bud link state: byte 7 counts the buds connected to the host.
             var buds = AapDecoder.ParseBudState(d);
             PodsConnected = buds.Connected;
-            BudRole = buds.Role;
+            BudRole = buds.State;
+            BudState = buds.State;
             InEarChangedAt = DateTime.Now;
         }
     }
@@ -472,7 +523,7 @@ if (d[4] == 0x08)
         else if (d[4] == 0x06)
         {
             var buds = AapDecoder.ParseBudState(d);
-            yield return $"bud state role={buds.Role} connected={buds.Connected}";
+            yield return $"bud state state={buds.State} connected={buds.Connected}";
         }
         else if (d[4] == 0x08)
         {
