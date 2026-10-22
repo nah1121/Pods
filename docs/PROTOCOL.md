@@ -213,12 +213,27 @@ parsing must stop at the first non-printable byte. Expected order:
 
 ### Ear detection — `cmd 0x06`
 
+Captured frames are 8 bytes:
+
 ```
-04 00 04 00 06 00 <right> <left>
+04 00 04 00 06 00 <role> <mask>
 ```
 
-Byte 7 is the right bud, byte 8 the left. Frame length varies (8/9/10 bytes), so read
-the fields defensively.
+Byte 7 is a **bitmask**, not a pair of flags. The values observed are `0x00` (neither
+bud), `0x01` (one bud) and `0x03` (both buds) — `0x02` never appears, which is what you
+would expect from a bitmask when only one bud is worn.
+
+```
+bit 0 -> left bud      (ASSUMED, not yet confirmed)
+bit 1 -> right bud
+```
+
+Byte 6 alternates between `0x00` and `0x01`; its meaning is unknown.
+
+> **Open question:** the bit-to-bud mapping is a working assumption. It is the one
+> remaining unconfirmed detail in this document. `aapprobe watch` prints the raw frames,
+> so it can be settled with a short sequence — wear both buds, remove one, put it back,
+> remove the other — and reading the mask transitions.
 
 `cmd 0x08` looks superficially similar but is **role/setup** — it does not change as pods
 are moved.
@@ -234,9 +249,7 @@ are moved.
 | `0x2b` | MAC addresses of both ends |
 | `0x31` | session key material |
 
----
-
-## Push cadence and refresh
+### Push cadence and refresh
 
 The AirPods push battery on their own schedule, roughly every 60 s. There is **no
 battery-request command** — sending `EnableNotifications` or `AapInitExt` does not

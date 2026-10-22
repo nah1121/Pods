@@ -5,6 +5,7 @@
         MinHeight="700" MinWidth="760"
         Background="{StaticResource BgBrush}"
         Foreground="{StaticResource TextBrush}"
+        Icon="Assets/Pods.ico"
         FontFamily="{StaticResource UiFont}"
         FontSize="13"
         TextOptions.TextFormattingMode="Ideal"

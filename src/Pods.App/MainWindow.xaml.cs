@@ -158,10 +158,10 @@ public partial class MainWindow : Window
 
     void UpdateEar(AapSession s)
     {
-        // cmd 0x06: byte7 = right, byte8 = left.
+        // cmd 0x06: byte 7 is a bitmask - bit 0 is the left bud, bit 1 the right.
         if (s.LeftInEar is bool l && s.RightInEar is bool r)
         {
-            EarText.Text = $"L {(l ? "in" : "out")}   R {(r ? "in" : "out")}";
+            EarText.Text = $"Ear  L {(l ? "in" : "out")}   R {(r ? "in" : "out")}";
             EarText.Foreground = new SolidColorBrush(
                 (Color)ColorConverter.ConvertFromString(l && r ? "#2ECC71" : "#8B95A7"));
         }

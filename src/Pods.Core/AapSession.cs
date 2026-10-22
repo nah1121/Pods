@@ -272,32 +272,20 @@ public sealed class AapSession : IDisposable
         {
             RawBattery.Add(d);
             LastBatteryAt = DateTime.Now;
-            int count = d[6], start = 7;
-            for (int i = 0; i < count && start + 3 < d.Length; i++)
+
+            foreach (var b in AapDecoder.ParseBattery(d))
             {
-                int level = d[start + 2];
-                string st = d[start + 3] switch
+                switch (b.Side)
                 {
-                    0 => "undefined", 1 => "charging", 2 => "not charging", 4 => "disconnected", _ => "?"
-                };
-
-                // A fake AirPod reports 0xFF (and 0x7F on some firmware) for an
-                // unreadable sensor rather than a real level. MagicPodsCore documents
-                // this in AapBatteryWatcher.h ("ff - unknown") and notes fake units
-                // "send a value of 127 after the case is closed".
-                // Treat any level outside 0..100 as unknown instead of printing 255%.
-                bool unknown = level > 100;
-                int? shown = unknown ? null : level;
-                if (unknown) st = "unknown";
-
-                switch (d[start])
-                {
-                    case 0x01: LeftBattery = RightBattery = shown; LeftCharging = RightCharging = st; LeftStatus = RightStatus = st; break;
-                    case 0x02: RightBattery = shown; RightCharging = st; RightStatus = st; break;
-                    case 0x04: LeftBattery = shown; LeftCharging = st; LeftStatus = st; break;
-                    case 0x08: CaseBattery = shown; CaseCharging = st; CaseStatus = st; break;
+                    case "Single":
+                        LeftBattery = RightBattery = b.Level;
+                        LeftCharging = RightCharging = b.Status;
+                        LeftStatus = RightStatus = b.Status;
+                        break;
+                    case "Right": RightBattery = b.Level; RightCharging = b.Status; RightStatus = b.Status; break;
+                    case "Left": LeftBattery = b.Level; LeftCharging = b.Status; LeftStatus = b.Status; break;
+                    case "Case": CaseBattery = b.Level; CaseCharging = b.Status; CaseStatus = b.Status; break;
                 }
-                start += 5;
             }
         }
         else if (d[4] == 0x09 && d.Length >= 8)
@@ -321,39 +309,26 @@ public sealed class AapSession : IDisposable
         }
         else if (d[4] == 0x1d && d.Length > 14)
         {
-            var strings = ParseStrings(d);
-
             // The string table is followed by binary data which can itself contain
             // printable runs, so each field is shape-checked before it is accepted.
-            // Expected layout:
-            //   0 product name ("AirPods Pro")   1 model ("A2084")
-            //   2 manufacturer ("Apple Inc.")    3 serial ("GX5ZK3T9LKKT")
-            //   4 firmware ("51.9.6")
-            if (strings.Count > 0 && IsWords(strings[0])) ModelName = strings[0];
-            if (strings.Count > 1 && IsAlnum(strings[1], 12)) ModelId = strings[1];
-            if (strings.Count > 2 && IsWords(strings[2])) Manufacturer = strings[2];
-            if (strings.Count > 3 && IsAlnum(strings[3], 24)) Serial = strings[3];
-            if (strings.Count > 4 && IsVersion(strings[4])) Firmware = strings[4];
+            var id = AapDecoder.ParseIdentity(d);
+            if (id.ProductName != null) ModelName = id.ProductName;
+            if (id.Model != null) ModelId = id.Model;
+            if (id.Manufacturer != null) Manufacturer = id.Manufacturer;
+            if (id.Serial != null) Serial = id.Serial;
+            if (id.Firmware != null) Firmware = id.Firmware;
         }
         else if (d[4] is 0x06 or 0x08 or 0x0c or 0x0e)
         {
             RawWatch.Enqueue(d);
         }
 
-        if (d[4] == 0x06)
+if (d[4] == 0x06)
         {
-            // In-ear detection. cmd 0x06 carries one byte per bud, but the observed
-            // frame length varies (8/9/10 B), so the fields are read defensively:
-            //   04 00 04 00 06 00 <right> <left> ...
-            //   04 00 04 00 06 00 00 03       (both-out style, extra trailing byte)
-            //
-            // ASSIGNMENT (assumed, not fully proven): byte7 = RIGHT, byte8 = LEFT.
-            // Evidence: a frame "00 01" was captured at the same moment MagicPods
-            // logged "L in R in", and "00 00" when it logged "L out R out".
-            // The varying length means this can legitimately differ by firmware, so
-            // treat it as the best current reading rather than settled fact.
-            if (d.Length >= 8) RightInEar = d[7] != 0;
-            if (d.Length >= 9) LeftInEar = d[8] != 0;
+            // In-ear detection (cmd 0x06): byte 7 is a bitmask of which buds are in.
+            var ear = AapDecoder.ParseEar(d);
+            LeftInEar = ear.LeftIn;
+            RightInEar = ear.RightIn;
             InEarChangedAt = DateTime.Now;
         }
     }
@@ -430,59 +405,6 @@ public sealed class AapSession : IDisposable
         0x26 => "Personalized volume", 0x28 => "Conversation awareness",
         0x2e => "Adaptive audio noise", _ => $"0x{sub:x2}"
     };
-
-    /// <summary>
-    /// <summary>Letters and spaces only - product names and manufacturers.</summary>
-    static bool IsWords(string s) =>
-        s.Length is >= 3 and <= 32 && s.All(c => char.IsLetter(c) || c == ' ' || c == '.');
-
-    /// <summary>Alphanumeric identifier, e.g. a model or serial number.</summary>
-    static bool IsAlnum(string s, int max) =>
-        s.Length >= 3 && s.Length <= max && s.All(c => char.IsLetterOrDigit(c));
-
-    /// <summary>Dotted numeric version, e.g. "51.9.6". Each part is short.</summary>
-    static bool IsVersion(string s)
-    {
-        var parts = s.Split('.');
-        return parts.Length is >= 2 and <= 4
-            && parts.All(p => p.Length > 0 && p.Length <= 3 && p.All(char.IsDigit));
-    }
-
-    /// Parse the identity string table from a cmd 0x1d frame.
-    ///
-    /// Layout (verified against captured frames):
-    ///   [0..3] envelope   [4]=0x1d   [5..10] header   [11..] NULL-TERMINATED strings
-    /// The strings are null-terminated, NOT length-prefixed, and binary data follows
-    /// them - so parsing stops at the first byte that is not printable ASCII.
-    ///
-    /// Known strings in order: "AirPods Pro", "A2084", "Apple Inc.", serial,
-    /// firmware "51.9.6", build, "1.0.0", accessory app id, ...
-    /// </summary>
-    static List<string> ParseStrings(byte[] d, int start = 11)
-    {
-        var result = new List<string>();
-        int p = start;
-        while (p < d.Length)
-        {
-            int end = p;
-            while (end < d.Length && d[end] != 0) end++;
-            if (end >= d.Length) break;
-
-            if (end == p) { p++; continue; }              // empty string, skip
-
-            // Every byte must be printable ASCII, otherwise we have hit binary data.
-            bool printable = true;
-            for (int i = p; i < end; i++)
-            {
-                if (d[i] < 0x20 || d[i] > 0x7E) { printable = false; break; }
-            }
-            if (!printable) break;
-
-            result.Add(Encoding.ASCII.GetString(d, p, end - p));
-            p = end + 1;
-        }
-        return result;
-    }
 
     /// <summary>
     /// Decode an inbound frame. Battery (cmd 0x04) follows AapBatteryWatcher::ProcessResponse:
