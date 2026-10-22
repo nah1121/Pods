@@ -6,6 +6,81 @@ using System.Text;
 namespace Pods.Core;
 
 /// <summary>
+/// A session-wide lock on the AirPods device.
+///
+/// The driver delivers its push stream to a single client - both clients can hold the
+/// device open, but only one receives frames. Two of our own apps running at once is
+/// therefore a silent failure mode: the second one connects, looks fine, and never
+/// receives any data.
+///
+/// This lock makes that explicit: whoever holds it owns the device, and the others
+/// say so instead of appearing to work.
+/// </summary>
+public static class DeviceLock
+{
+    static Mutex _mutex;
+    static string _holder;
+
+    public static bool IsHeld => _mutex != null;
+
+    /// <summary>Name of the app currently holding the device, if any.</summary>
+    public static string Holder => _holder;
+
+    /// <summary>Human explanation for a device open failure.</summary>
+    public static string ExplainOpenError(int win32) => win32 switch
+    {
+        32 => "another application is already using the AirPods",
+        5 => "access was denied",
+        2 => "the device interface is not registered",
+        3 => "the device interface is not present right now",
+        _ => $"the device could not be opened (error {win32})"
+    };
+
+    /// <summary>
+    /// Try to take the device lock. Returns false when another instance already has it.
+    /// </summary>
+    public static bool TryAcquire(string appName)
+    {
+        if (_mutex != null) return true;
+        try
+        {
+            _mutex = new Mutex(false, @"Local\Pods.AapDevice");
+            if (_mutex.WaitOne(0))
+            {
+                _holder = appName;
+                return true;
+            }
+            _mutex.Dispose();
+            _mutex = null;
+            return false;
+        }
+        catch (AbandonedMutexException)
+        {
+            // The previous owner died without releasing - take it.
+            _holder = appName;
+            return true;
+        }
+        catch
+        {
+            return true;   // if locking is unavailable, don't block the app
+        }
+    }
+
+    public static void Release()
+    {
+        try
+        {
+            if (_mutex == null) return;
+            _mutex.ReleaseMutex();
+            _mutex.Dispose();
+        }
+        catch { }
+        _mutex = null;
+        _holder = null;
+    }
+}
+
+/// <summary>
 /// High-level session over the MagicAAP driver.
 ///
 /// The single most important behaviour encoded here: a setting is only accepted by the
@@ -38,14 +113,21 @@ public sealed class AapSession : IDisposable
     public static AapSession Connect(CancellationToken ct = default)
     {
         var paths = AapTransport.FindDevicePaths();
+        int lastError = 0;
         foreach (var p in paths)
         {
             try { return new AapSession(AapTransport.Open(p)); }
-            catch (Win32Exception) { }
+            catch (Win32Exception ex) { lastError = ex.NativeErrorCode; }
         }
+
+        if (paths.Count == 0)
+            throw new InvalidOperationException(
+                "The MagicAAP device interface is not present. The AirPods must be paired "
+                + "and the MagicAAP driver must be running.");
+
         throw new InvalidOperationException(
-            "MagicAAP interface unavailable. AirPods must be connected and awake. " +
-            "Close MagicPods first so only one client owns the channel.");
+            "The MagicAAP device could not be opened because "
+            + DeviceLock.ExplainOpenError(lastError) + ".");
     }
 
     public bool TryConnect(out string error)
@@ -175,14 +257,41 @@ public sealed class AapSession : IDisposable
     // MagicPods logs these through its AapAncWatcher / battery watcher, proving the
     // buds actively echo applied settings rather than only accepting writes.
     public byte? AncMode { get; private set; }
-    public int? LeftBattery { get; private set; }
-    public int? RightBattery { get; private set; }
-    public int? CaseBattery { get; private set; }
+    public int? LeftBattery => _leftBattery;
+    public int? RightBattery => _rightBattery;
+    public int? CaseBattery => _caseBattery;
     public string LeftCharging { get; private set; }
     public string RightCharging { get; private set; }
     public bool? LeftInEar { get; private set; }
     public bool? RightInEar { get; private set; }
     public DateTime? InEarChangedAt { get; private set; }
+
+    /// <summary>When each side's battery level was last actually reported.</summary>
+    public DateTime? LeftBatteryAt { get; private set; }
+    public DateTime? RightBatteryAt { get; private set; }
+    public DateTime? CaseBatteryAt { get; private set; }
+
+    // Backing fields so a level can be updated in place - the buds and the case drop
+    // out of reporting for a few seconds at a time (level 0 or 0xFF with a "no reading"
+    // status), and clobbering the last good value with that is what made the display
+    // flicker.
+    int? _leftBattery, _rightBattery, _caseBattery;
+    DateTime? _leftAt, _rightAt, _caseAt;
+
+    /// <summary>
+    /// Record a battery level, but only when the device gave a real one.
+    /// </summary>
+    void SetLevel(int side, AapDecoder.BatteryBlock b)
+    {
+        if (b.Level is not int p) return;
+        DateTime now = DateTime.Now;
+        switch (side)
+        {
+            case 0: _leftBattery = p; _leftAt = now; break;
+            case 1: _rightBattery = p; _rightAt = now; break;
+            case 2: _caseBattery = p; _caseAt = now; break;
+        }
+    }
 
     /// <summary>
     /// How many buds are currently connected over the AAP channel, as reported by
@@ -389,16 +498,27 @@ public sealed class AapSession : IDisposable
 
             foreach (var b in AapDecoder.ParseBattery(d))
             {
+                // A bud or the case intermittently stops reporting: the level comes
+                // back as 0 (or 0xFF) with a "no reading" / "disconnected" status.
+                // Overwriting the last good level with that makes the display flicker,
+                // so the level is only replaced when a real one arrives - the status
+                // still records what the device said just now.
                 switch (b.Side)
                 {
                     case "Single":
-                        LeftBattery = RightBattery = b.Level;
+                        SetLevel(0, b); SetLevel(1, b);
                         LeftCharging = RightCharging = b.Status;
                         LeftStatus = RightStatus = b.Status;
                         break;
-                    case "Right": RightBattery = b.Level; RightCharging = b.Status; RightStatus = b.Status; break;
-                    case "Left": LeftBattery = b.Level; LeftCharging = b.Status; LeftStatus = b.Status; break;
-                    case "Case": CaseBattery = b.Level; CaseCharging = b.Status; CaseStatus = b.Status; break;
+                    case "Right":
+                        SetLevel(1, b);
+                        RightCharging = b.Status; RightStatus = b.Status; break;
+                    case "Left":
+                        SetLevel(0, b);
+                        LeftCharging = b.Status; LeftStatus = b.Status; break;
+                    case "Case":
+                        SetLevel(2, b);
+                        CaseCharging = b.Status; CaseStatus = b.Status; break;
                 }
             }
         }

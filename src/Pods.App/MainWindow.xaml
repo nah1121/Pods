@@ -67,8 +67,17 @@
                         <TextBlock x:Name="RightBatteryText" Text="--" Style="{StaticResource Dim}"
                                    VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="58"/>
                     </StackPanel>
-                    <TextBlock x:Name="CaseText" Text="C --" Style="{StaticResource Dim}" VerticalAlignment="Center"
-                               MinWidth="86" Margin="0,0,8,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
+                        <TextBlock Text="C" Style="{StaticResource SectionLabel}" VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <Border x:Name="CaseBatteryBar" Width="60" Height="9" CornerRadius="4.5"
+                                Background="{StaticResource SurfaceHiBrush}" VerticalAlignment="Center">
+                            <Rectangle x:Name="CaseBatteryFill" Width="0" Height="9" Fill="{StaticResource GoodBrush}"
+                                       HorizontalAlignment="Left"/>
+                        </Border>
+                        <TextBlock x:Name="CaseText" Text="--" Style="{StaticResource Dim}"
+                                   VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="86"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- Identity + ear detection -->

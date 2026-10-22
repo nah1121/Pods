@@ -125,6 +125,7 @@ public static class AapDecoder
         0x00 => "undefined",
         0x01 => "charging",
         0x02 => "not charging",
+        0x03 => "no reading",
         0x04 => "disconnected",
         _ => "unknown"
     };

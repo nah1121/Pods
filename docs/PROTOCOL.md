@@ -184,6 +184,7 @@ type byte must be used to identify each block.
 | `0x00` | undefined |
 | `0x01` | charging |
 | `0x02` | not charging |
+| `0x03` | **no reading** — the device dropped out of reporting for a moment |
 | `0x04` | disconnected — the case is empty, or the bud is in a closed case |
 
 The status byte is what tells you a pod is charging *because it is in the case*:
@@ -197,7 +198,25 @@ right 98 charging       left 98 charging   case 79 not-charging   <- right start
 So: a pod reporting `0x01` is in the case and charging; the case itself reports `0x04`
 when it is empty, `0x02` when present but idle, and `0x01` when charging.
 
-Two quirks on clone hardware:
+### The case stops reporting intermittently
+
+Over 167 captured battery frames the case read:
+
+| (level, status) | count |
+|---|---|
+| `(0, 0x04)` disconnected | 50 |
+| `(0, 0x03)` no reading | 17 |
+| `(81, 0x02)`, `(78, 0x02)`, `(82, 0x02)`, `(79, 0x02)` | 100 |
+
+The case level flips to 0 and back within seconds, roughly 20 times over the capture.
+So a level of 0 does **not** mean "empty case" — it means the case did not report this
+cycle. `0x03` is an undocumented status that always comes with a level of 0 (or `0xFF`).
+
+The app therefore keeps the **last good level** and only replaces it when a real one
+arrives, dimming it when it goes stale. Overwriting it with 0 each cycle is what made the
+case reading flicker.
+
+Two more quirks on clone hardware:
 
 * **`0xFF` is a no-reading sentinel, not a percentage.** MagicPodsCore documents it
   (`AapBatteryWatcher.h`: `// ff - unknown`) and notes that fake units "send a value of
@@ -304,3 +323,14 @@ device open (`FILE_SHARE_READ|WRITE` allows it), but only one receives the live 
 
 So close any other AAP client before using this. If the app goes quiet, that is usually
 why — the GUI detects 20 s of silence and reconnects automatically.
+
+This bites in two ways:
+
+* **A leftover process holds the device.** A stale instance that was never closed keeps
+  the channel, and the next app connects but never receives anything. The symptom is
+  "battery shows in one app but not the other".
+* **Two of our own apps fight.** `DeviceLock` (a named mutex) makes the second one say
+  so explicitly instead of appearing to work.
+
+Both apps now report the real reason when a connection fails, and the connect path
+retries a few times.

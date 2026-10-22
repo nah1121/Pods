@@ -38,8 +38,24 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // Only one client can receive the push stream, so take the device lock and say
+        // so plainly if another app already has it.
+        if (!DeviceLock.TryAcquire("Frame monitor"))
+        {
+            StatusText.Text = "Another app already has the AirPods";
+            FooterHint.Text = "The driver sends the live stream to one client only. "
+                            + "Close Pods (or MagicPods) and press Reconnect.";
+            _lockedOut = true;
+        }
+
         Loaded += async (_, _) => await ConnectAsync();
-        Closing += (_, _) => { AapSession.CaptureAllFrames = false; _session?.Dispose(); };
+        Closing += (_, _) =>
+        {
+            AapSession.CaptureAllFrames = false;
+            _session?.Dispose();
+            if (!_lockedOut) DeviceLock.Release();
+        };
         LoadMap();
 
         // Keep the decoded battery / bud-state panel up to date.
@@ -48,6 +64,8 @@ public partial class MainWindow : Window
         timer.Tick += (_, _) => UpdateLiveState();
         timer.Start();
     }
+
+    bool _lockedOut;
 
     /// <summary>Render the decoded battery levels and per-bud state.</summary>
     void UpdateLiveState()
@@ -75,7 +93,13 @@ public partial class MainWindow : Window
             bar.Width = maxWidth * Math.Clamp(p, 0, 100) / 100.0;
             bar.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
                 status == "charging" ? "#2ECC71" : "#8B95A7"));
-            label.Text = status == "charging" ? $"{p}% charging" : $"{p}%";
+            label.Text = status switch
+            {
+                "charging" => $"{p}% charging",
+                "no reading" => $"{p}% (no read)",
+                "disconnected" => $"{p}% (in case)",
+                _ => $"{p}%",
+            };
         }
         else
         {

@@ -23,8 +23,25 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // Only one client receives the driver's push stream. Take the device lock so a
+        // second copy of this app - or the frame monitor - says so instead of
+        // silently sitting there with no data.
+        if (!DeviceLock.TryAcquire("Pods"))
+        {
+            _lockedOut = true;
+            SetStatus("Another app has the AirPods", false);
+            Log("Another app already has the AirPods. The driver sends the live stream "
+                + "to one client only - close the frame monitor or MagicPods, then "
+                + "press Reconnect.");
+        }
+
         Loaded += async (_, _) => await ConnectAsync();
-        Closing += (_, _) => _session?.Dispose();
+        Closing += (_, _) =>
+        {
+            _session?.Dispose();
+            if (!_lockedOut) DeviceLock.Release();
+        };
 
         // Battery can go quiet without any inbound frame arriving, so poll the UI
         // independently to keep the staleness indicator honest.
@@ -47,6 +64,8 @@ public partial class MainWindow : Window
         };
         timer.Start();
     }
+
+    bool _lockedOut;
 
     // ---------------------------------------------------------------- logging
 
@@ -102,24 +121,14 @@ public partial class MainWindow : Window
 
         BatteryPanel.Visibility = Visibility.Visible;
 
-        SetGauge(LeftBatteryFill, LeftBatteryText, s.LeftBattery, s.LeftStatus, quiet);
-        SetGauge(RightBatteryFill, RightBatteryText, s.RightBattery, s.RightStatus, quiet);
+        SetGauge(LeftBatteryFill, LeftBatteryText, s.LeftBattery, s.LeftStatus, quiet,
+                 s.LeftBatteryAt);
+        SetGauge(RightBatteryFill, RightBatteryText, s.RightBattery, s.RightStatus, quiet,
+                 s.RightBatteryAt);
 
-        // The case reports "disconnected" when it is empty (no pods in it), which is
-        // not the same as "not charging" - show a dash rather than a fake 0%.
-        bool casePresent = s.CaseStatus is string cs && cs != "disconnected";
-        if (casePresent)
-        {
-            CaseText.Text = s.CaseBattery is int c
-                ? $"C {c}%{(s.CaseStatus == "charging" ? " charging" : "")}"
-                : "C --";
-        }
-        else
-        {
-            CaseText.Text = "C --";
-        }
-        CaseText.Foreground = new SolidColorBrush(
-            (Color)ColorConverter.ConvertFromString(casePresent ? "#8B95A7" : "#5C6678"));
+        // The case drops out of reporting for a few seconds at a time, so keep showing
+        // the last level it gave rather than blanking it.
+        SetGauge(CaseBatteryFill, CaseText, s.CaseBattery, s.CaseStatus, quiet, s.CaseBatteryAt);
 
         FooterHint.Text = s.LastBatteryAt is null
             ? "Waiting for the first battery reading - the buds only report while active"
@@ -128,18 +137,16 @@ public partial class MainWindow : Window
               : $"{s.FrameCount} frames received";
     }
 
-    static void SetGauge(Rectangle fill, TextBlock label, int? pct, string status, bool quiet)
+    /// <summary>
+    /// Draw one battery slot. The level is only replaced when the device actually
+    /// reports one, so a momentary dropout shows the last known value dimmed rather
+    /// than blanking the row.
+    /// </summary>
+    static void SetGauge(Rectangle fill, TextBlock label, int? pct, string status, bool quiet,
+                          DateTime? at, string prefix = "")
     {
-        // "disconnected" means the bud is not reporting at all - typically because it is
-        // in a closed case. The device sends level 0 with that status, so showing "0%"
-        // would be wrong.
-        if (status == "disconnected")
-        {
-            fill.Width = 0;
-            label.Text = "in case";
-            label.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5C6678"));
-            return;
-        }
+        bool stale = at is DateTime t && (DateTime.Now - t).TotalSeconds > 90;
+        bool reporting = status is "charging" or "not charging";
 
         if (pct is int p)
         {
@@ -148,17 +155,21 @@ public partial class MainWindow : Window
             {
                 "charging" => " charging",
                 "not charging" => "",
-                "unknown" => " no read",
+                "no reading" => " (no read)",
+                "disconnected" => " (in case)",
+                "unknown" => " (no read)",
                 _ => ""
             };
-            label.Text = $"{p}%{suffix}";
+            label.Text = $"{prefix}{p}%{suffix}";
             label.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
-                status == "charging" ? "#2ECC71" : quiet ? "#5C6678" : "#8B95A7"));
+                status == "charging" ? "#2ECC71"
+                : stale || !reporting ? "#5C6678"
+                : quiet ? "#5C6678" : "#8B95A7"));
         }
         else
         {
             fill.Width = 0;
-            label.Text = status == "disconnected" ? "in case" : "--";
+            label.Text = $"{prefix}--";
             label.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5C6678"));
         }
     }
@@ -247,12 +258,36 @@ public partial class MainWindow : Window
 
         try
         {
-            var session = await Task.Run(() => AapSession.Connect());
+            // The interface can be momentarily unavailable while the AirPods negotiate
+            // with Windows, so retry a few times before giving up.
+            AapSession session = null;
+            Exception last = null;
+            for (int attempt = 1; attempt <= 4 && session == null; attempt++)
+            {
+                try { session = await Task.Run(() => AapSession.Connect()); }
+                catch (Exception ex)
+                {
+                    last = ex;
+                    if (attempt < 4)
+                    {
+                        Log($"Connect attempt {attempt} failed: {ex.Message} - retrying...");
+                        await Task.Delay(2000);
+                    }
+                }
+            }
+            if (session == null) throw last;
+
             session.Log += Log;
             _session?.Dispose();
             _session = session;
             Log($"Connected: {session.DevicePath}");
             SetStatus("Connected", true);
+            if (_lockedOut)
+            {
+                Log("NOTE: another app holds the device, so this connection will not "
+                    + "receive any frames. Close that app and press Reconnect.");
+                SetStatus("No data - another app has the AirPods", false);
+            }
 
             // Order matters: the driver queue is synchronous+sequential, so all writes
             // must complete before the blocking receive loop is started.
