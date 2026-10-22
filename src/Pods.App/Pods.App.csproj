@@ -23,4 +23,12 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Shared design system, linked so the pack URI is /Theme.xaml here and in
+         the frame monitor. -->
+    <Resource Include="..\Shared\Theme.xaml">
+      <Link>Theme.xaml</Link>
+    </Resource>
+  </ItemGroup>
+
 </Project>

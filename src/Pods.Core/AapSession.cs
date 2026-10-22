@@ -277,6 +277,8 @@ public sealed class AapSession : IDisposable
     {
         if (d == null || d.Length < 6) return;
 
+        if (CaptureAllFrames) RawFrames.Enqueue(d);
+
         if (d[4] == 0x04 && d.Length >= 11)
         {
             RawBattery.Add(d);
@@ -388,6 +390,15 @@ if (d[4] == 0x08)
 
     /// <summary>Raw ear-detection / role frames (cmd 0x06, 0x08, 0x0c, 0x0e).</summary>
     public static ConcurrentQueue<byte[]> RawWatch { get; } = new();
+
+    /// <summary>
+    /// Every inbound frame, in arrival order. Used by the live frame monitor so
+    /// unknown codes can be inspected and labelled.
+    /// </summary>
+    public static ConcurrentQueue<byte[]> RawFrames { get; } = new();
+
+    /// <summary>Frames that are only useful for debugging - not captured by default.</summary>
+    public static bool CaptureAllFrames { get; set; }
 
     public static string PressSpeedName(byte? v) => v switch
     { null => "?", 0 => "Default", 1 => "Slower", 2 => "Slowest", _ => $"({v})" };

@@ -112,7 +112,8 @@ symbol tables. 73 functions were recovered.
 * **What marks a handle as the data sink?** The driver delivers the push stream to one
   reader. `FUN_140002068` (638 bytes) handles the `0x410003` response path and is the
   most likely place the answer lives.
-* **Why do ear-detection frames only appear in the startup burst?** Possibly a
-  notification-registration flag set during bring-up.
 * **`cmd 0x17`** (firmware info) carries XMP property blobs that are still undecoded —
   `MaxReportSize`, `RepDescriptor`, `RangeReport`, `VendorID`, `VendorVersion`.
+* **Per-bud in-ear state** does not appear to be carried on the L2CAP channel at all.
+  MagicPods derives it from BLE advertisements. `tools/FrameMonitor` exists to work out
+  what the remaining codes mean.

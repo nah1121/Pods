@@ -91,6 +91,19 @@ pods-cli full 3                   # handshake, then set transparency
 
 Run `pods-cli` with no arguments for the full list of settings.
 
+### Frame monitor
+
+`frame-monitor` is a live window that shows every frame the AirPods send, in order,
+with new codes highlighted. Any frame can be tagged with what it means, and the tags
+are saved to `%LOCALAPPDATA%\PodsClone\frame-map.json`.
+
+This is how the protocol was worked out — it is the tool to reach for when a code's
+meaning is unknown.
+
+```powershell
+dotnet run --project tools/FrameMonitor
+```
+
 ---
 
 ## How it works
@@ -132,6 +145,7 @@ src/Pods.Core     protocol, transport, device session
 src/Pods.App      WPF desktop app
 src/Pods.Cli      command-line interface
 tools/AapProbe    protocol debugger
+tools/FrameMonitor  live frame monitor with tagging
 tests/            unit tests for the protocol layer
 docs/             protocol and driver notes
 ```
