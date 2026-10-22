@@ -82,11 +82,13 @@ The window shows live battery, the device's confirmed settings, and an activity 
 ### CLI
 
 ```powershell
-pods list                     # discover the driver interface
-pods read 120                 # dump inbound frames
-pods set anc 2                # turn noise cancellation on
-pods full 3                   # handshake, then set transparency
+pods-cli list                     # discover the driver interface
+pods-cli read 120                 # dump inbound frames
+pods-cli set anc 2                # turn noise cancellation on
+pods-cli full 3                   # handshake, then set transparency
 ```
+
+Run `pods-cli` with no arguments for the full list of settings.
 
 ---
 
