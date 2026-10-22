@@ -1,0 +1,310 @@
+<Window x:Class="Pods.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pods - AirPods control" Height="860" Width="880"
+        MinHeight="700" MinWidth="760"
+        Background="{StaticResource BgBrush}"
+        Foreground="{StaticResource TextBrush}"
+        FontFamily="{StaticResource UiFont}"
+        FontSize="13"
+        TextOptions.TextFormattingMode="Ideal"
+        UseLayoutRounding="True"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ========================= Header ========================= -->
+        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
+                Padding="24,18">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Device + connection -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse x:Name="StatusDot" Width="9" Height="9" Fill="{StaticResource BadBrush}"
+                             VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <StackPanel>
+                        <TextBlock x:Name="DeviceName" Text="AirPods Pro" Style="{StaticResource Title}"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="240"/>
+                        <TextBlock x:Name="StatusText" Text="Connecting..."
+                                   Style="{StaticResource Dim}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Battery gauges -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
+                            VerticalAlignment="Center" x:Name="BatteryPanel" Visibility="Collapsed"
+                            Margin="34,0,20,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,26,0">
+                        <TextBlock Text="L" Style="{StaticResource SectionLabel}" VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <Border x:Name="LeftBatteryBar" Width="86" Height="9" CornerRadius="4.5"
+                                Background="{StaticResource SurfaceHiBrush}" VerticalAlignment="Center">
+                            <Rectangle x:Name="LeftBatteryFill" Width="0" Height="9" Fill="{StaticResource GoodBrush}"
+                                       HorizontalAlignment="Left"/>
+                        </Border>
+                        <TextBlock x:Name="LeftBatteryText" Text="--" Style="{StaticResource Dim}"
+                                   VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="58"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="R" Style="{StaticResource SectionLabel}" VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <Border x:Name="RightBatteryBar" Width="86" Height="9" CornerRadius="4.5"
+                                Background="{StaticResource SurfaceHiBrush}" VerticalAlignment="Center">
+                            <Rectangle x:Name="RightBatteryFill" Width="0" Height="9" Fill="{StaticResource GoodBrush}"
+                                       HorizontalAlignment="Left"/>
+                        </Border>
+                        <TextBlock x:Name="RightBatteryText" Text="--" Style="{StaticResource Dim}"
+                                   VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="58"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Identity + ear detection -->
+                <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock x:Name="EarText" Text="" Style="{StaticResource Dim}" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="IdentityText" Text="" Style="{StaticResource Mono}"
+                               HorizontalAlignment="Right" Margin="0,3,0,0" Opacity="0.75"
+                               TextTrimming="CharacterEllipsis" MaxWidth="260"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ========================= Content ========================= -->
+        <ScrollViewer Grid.Row="1" Padding="24,20,24,20">
+            <StackPanel>
+
+                <!-- Noise control (hero) -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,12">
+                            <TextBlock Text="NOISE CONTROL" Style="{StaticResource SectionLabel}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="AncStateText" Text="" Style="{StaticResource Dim}"
+                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Border Style="{StaticResource SegmentGroup}">
+                            <UniformGrid x:Name="AncPanel" Rows="1" Columns="4">
+                                <RadioButton x:Name="AncOff" Style="{StaticResource Segment}" Content="Off"
+                                             Tag="1" GroupName="anc" Checked="Anc_Checked"/>
+                                <RadioButton x:Name="AncOn" Style="{StaticResource Segment}" Content="Noise cancellation"
+                                             Tag="2" GroupName="anc" Checked="Anc_Checked"/>
+                                <RadioButton x:Name="AncTransparency" Style="{StaticResource Segment}" Content="Transparency"
+                                             Tag="3" GroupName="anc" Checked="Anc_Checked"/>
+                                <RadioButton x:Name="AncAdaptive" Style="{StaticResource Segment}" Content="Adaptive"
+                                             Tag="4" GroupName="anc" Checked="Anc_Checked"/>
+                            </UniformGrid>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- Two column grid -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: behaviour -->
+                    <Border Grid.Column="0" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="BEHAVIOUR" Style="{StaticResource SectionLabel}" Margin="0,0,0,6"/>
+
+                            <Border Style="{StaticResource SettingRow}">
+                                <Grid>
+                                    <TextBlock Text="Press speed" Style="{StaticResource Body}" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <RadioButton x:Name="PressSpeed0" Style="{StaticResource Segment}" Content="Default"
+                                                     Tag="0" GroupName="ps" Checked="PressSpeed_Checked"/>
+                                        <RadioButton x:Name="PressSpeed1" Style="{StaticResource Segment}" Content="Slower"
+                                                     Tag="1" GroupName="ps" Checked="PressSpeed_Checked"/>
+                                        <RadioButton x:Name="PressSpeed2" Style="{StaticResource Segment}" Content="Slowest"
+                                                     Tag="2" GroupName="ps" Checked="PressSpeed_Checked"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingRow}">
+                                <Grid>
+                                    <TextBlock Text="Press and hold" Style="{StaticResource Body}" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <RadioButton x:Name="PressHold0" Style="{StaticResource Segment}" Content="Default"
+                                                     Tag="0" GroupName="ph" Checked="PressHold_Checked"/>
+                                        <RadioButton x:Name="PressHold1" Style="{StaticResource Segment}" Content="Shorter"
+                                                     Tag="1" GroupName="ph" Checked="PressHold_Checked"/>
+                                        <RadioButton x:Name="PressHold2" Style="{StaticResource Segment}" Content="Shortest"
+                                                     Tag="2" GroupName="ph" Checked="PressHold_Checked"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingRow}">
+                                <Grid>
+                                    <TextBlock Text="Volume swipe length" Style="{StaticResource Body}" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <RadioButton x:Name="SwipeLen0" Style="{StaticResource Segment}" Content="Default"
+                                                     Tag="0" GroupName="sl" Checked="SwipeLen_Checked"/>
+                                        <RadioButton x:Name="SwipeLen1" Style="{StaticResource Segment}" Content="Longer"
+                                                     Tag="1" GroupName="sl" Checked="SwipeLen_Checked"/>
+                                        <RadioButton x:Name="SwipeLen2" Style="{StaticResource Segment}" Content="Longest"
+                                                     Tag="2" GroupName="sl" Checked="SwipeLen_Checked"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingRow}" BorderThickness="0">
+                                <Grid Margin="0,10,0,0">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Tone volume" Style="{StaticResource Body}"/>
+                                        <TextBlock x:Name="ToneValueText" Text="50%" Style="{StaticResource Dim}"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Width="230">
+                                        <Slider x:Name="ToneSlider" Minimum="15" Maximum="100" Value="50"
+                                                Width="120" VerticalAlignment="Center"
+                                                ValueChanged="Tone_Changed"/>
+                                        <TextBlock x:Name="ToneValue" Text="50" Style="{StaticResource Dim}"
+                                                   VerticalAlignment="Center" Margin="10,0,0,0" MinWidth="26"/>
+                                        <Button Content="Apply" Style="{StaticResource GhostButton}"
+                                                Padding="10,4" MinWidth="0" Margin="12,0,0,0"
+                                                Click="Tone_Apply"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingRow}" BorderThickness="0" Margin="0,10,0,0">
+                                <Grid>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Adaptive audio noise" Style="{StaticResource Body}"/>
+                                        <TextBlock x:Name="AdaptiveValueText" Text="50%" Style="{StaticResource Dim}"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Width="230">
+                                        <Slider x:Name="AdaptiveSlider" Minimum="0" Maximum="100" Value="50"
+                                                Width="120" VerticalAlignment="Center"
+                                                ValueChanged="Adaptive_Changed"/>
+                                        <TextBlock x:Name="AdaptiveValue" Text="50" Style="{StaticResource Dim}"
+                                                   VerticalAlignment="Center" Margin="10,0,0,0" MinWidth="26"/>
+                                        <Button Content="Apply" Style="{StaticResource GhostButton}"
+                                                Padding="10,4" MinWidth="0" Margin="12,0,0,0"
+                                                Click="Adaptive_Apply"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Right: features -->
+                    <Border Grid.Column="2" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                                <TextBlock Text="FEATURES" Style="{StaticResource SectionLabel}"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="WriteOnlyNote" Text="" Style="{StaticResource Dim}"
+                                           FontSize="10.5" HorizontalAlignment="Right" Opacity="0.8"/>
+                            </Grid>
+
+                            <Border Style="{StaticResource SettingRow}">
+                                <Grid>
+                                    <TextBlock Text="Conversation awareness" Style="{StaticResource Body}" VerticalAlignment="Center"/>
+                                    <CheckBox x:Name="CaSwitch" Style="{StaticResource Switch}"
+                                              HorizontalAlignment="Right" IsChecked="False" Click="Ca_Click"/>
+                                </Grid>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingRow}">
+                                <Grid>
+                                    <TextBlock Text="Volume swipe" Style="{StaticResource Body}" VerticalAlignment="Center"/>
+                                    <CheckBox x:Name="VSwipeSwitch" Style="{StaticResource Switch}"
+                                              HorizontalAlignment="Right" IsChecked="False" Click="VSwipe_Click"/>
+                                </Grid>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingRow}">
+                                <Grid>
+                                    <TextBlock Text="Personalized volume" Style="{StaticResource Body}" VerticalAlignment="Center"/>
+                                    <CheckBox x:Name="PersonalizedSwitch" Style="{StaticResource Switch}"
+                                              HorizontalAlignment="Right" IsChecked="False" Click="Personalized_Click"/>
+                                </Grid>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingRow}">
+                                <Grid>
+                                    <TextBlock Text="Noise cancellation with one AirPod" Style="{StaticResource Body}"
+                                               VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="250"/>
+                                    <CheckBox x:Name="OneAirPodSwitch" Style="{StaticResource Switch}"
+                                              HorizontalAlignment="Right" IsChecked="False" Click="OneAirPod_Click"/>
+                                </Grid>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingRow}" BorderThickness="0">
+                                <Grid Margin="0,10,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Note" Style="{StaticResource Body}" FontSize="12"/>
+                                        <TextBlock Style="{StaticResource Dim}" FontSize="11" Margin="0,3,0,0"
+                                                   TextWrapping="Wrap"
+                                                   Text="These AirPods only echo back six settings. The rest are sent, but the hardware never confirms them."/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Activity -->
+                <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock Text="ACTIVITY" Style="{StaticResource SectionLabel}" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <CheckBox x:Name="RestoreOnLaunch" Content="Restore settings on connect"
+                                          IsChecked="True" Foreground="{StaticResource TextDimBrush}"
+                                          VerticalAlignment="Center" Margin="0,0,14,0" Click="Restore_Changed"/>
+                                <Button Content="Refresh" Style="{StaticResource GhostButton}"
+                                        Padding="12,5" MinWidth="0" Click="Refresh_Click"/>
+                                <Button Content="Reconnect" Style="{StaticResource GhostButton}"
+                                        Padding="12,5" MinWidth="0" Margin="8,0,0,0" Click="Reconnect_Click"/>
+                                <Button Content="Clear" Style="{StaticResource GhostButton}"
+                                        Padding="12,5" MinWidth="0" Margin="8,0,0,0" Click="ClearLog_Click"/>
+                            </StackPanel>
+                        </Grid>
+                        <Border Background="{StaticResource BgBrush}" BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1" CornerRadius="8" Padding="10" Height="132">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <TextBox x:Name="LogBox" Background="Transparent" Foreground="{StaticResource TextDimBrush}"
+                                         BorderThickness="0" IsReadOnly="True" TextWrapping="Wrap"
+                                         FontFamily="{StaticResource MonoFont}" FontSize="11.5"
+                                         VerticalScrollBarVisibility="Disabled" Padding="0"/>
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ========================= Footer ========================= -->
+        <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="24,12">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <ProgressBar x:Name="BusyBar" Width="120" Height="3" IsIndeterminate="True"
+                                 Visibility="Collapsed" Foreground="{StaticResource AccentBrush}"
+                                 VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <TextBlock x:Name="BusyText" Text="Working..." Style="{StaticResource Dim}"
+                               Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"
+                               Visibility="Collapsed"/>
+                </StackPanel>
+                <TextBlock x:Name="FooterHint" Text="" Style="{StaticResource Dim}"
+                           HorizontalAlignment="Right" VerticalAlignment="Center" Opacity="0.75"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

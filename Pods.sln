@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{6C30B57F-E840-4071-9695-49ABC5E695EB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pods.Core", "src\Pods.Core\Pods.Core.csproj", "{7591262E-9072-492F-8FE9-628D908ED158}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pods.App", "src\Pods.App\Pods.App.csproj", "{EEEF6B40-2AB2-4D97-80E3-F4E46AE59D3A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pods.Cli", "src\Pods.Cli\Pods.Cli.csproj", "{DF741B58-F827-47DF-9989-3C5346606D77}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{65155D42-0654-4DB1-B99C-3F457A5B3767}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AapProbe", "tools\AapProbe\AapProbe.csproj", "{6691472A-3354-4DCA-9152-DFC1BE10D88C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7591262E-9072-492F-8FE9-628D908ED158}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7591262E-9072-492F-8FE9-628D908ED158}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7591262E-9072-492F-8FE9-628D908ED158}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7591262E-9072-492F-8FE9-628D908ED158}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EEEF6B40-2AB2-4D97-80E3-F4E46AE59D3A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EEEF6B40-2AB2-4D97-80E3-F4E46AE59D3A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EEEF6B40-2AB2-4D97-80E3-F4E46AE59D3A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EEEF6B40-2AB2-4D97-80E3-F4E46AE59D3A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DF741B58-F827-47DF-9989-3C5346606D77}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DF741B58-F827-47DF-9989-3C5346606D77}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DF741B58-F827-47DF-9989-3C5346606D77}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DF741B58-F827-47DF-9989-3C5346606D77}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6691472A-3354-4DCA-9152-DFC1BE10D88C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6691472A-3354-4DCA-9152-DFC1BE10D88C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6691472A-3354-4DCA-9152-DFC1BE10D88C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6691472A-3354-4DCA-9152-DFC1BE10D88C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{7591262E-9072-492F-8FE9-628D908ED158} = {6C30B57F-E840-4071-9695-49ABC5E695EB}
+		{EEEF6B40-2AB2-4D97-80E3-F4E46AE59D3A} = {6C30B57F-E840-4071-9695-49ABC5E695EB}
+		{DF741B58-F827-47DF-9989-3C5346606D77} = {6C30B57F-E840-4071-9695-49ABC5E695EB}
+		{6691472A-3354-4DCA-9152-DFC1BE10D88C} = {65155D42-0654-4DB1-B99C-3F457A5B3767}
+	EndGlobalSection
+EndGlobal

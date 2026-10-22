@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+publish/
+*.user
+*.suo
+
+# IDE
+.vs/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Runtime settings written by the app
+settings.json
+
+# Local scratch
+*.log

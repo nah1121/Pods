@@ -1,0 +1,17 @@
+# Normalise text files in the repo to LF in the index, and check out with CRLF on
+# Windows. Keeps diffs clean regardless of each contributor's core.autocrlf setting.
+* text=auto
+
+*.cs      text diff=csharp
+*.csproj  text
+*.sln     text
+*.xaml    text
+*.md      text
+*.yml     text
+*.yaml    text
+*.json    text
+*.png     binary
+*.ico     binary
+*.exe     binary
+*.dll     binary
+*.sys     binary

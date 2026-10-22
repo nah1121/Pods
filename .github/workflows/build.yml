@@ -1,0 +1,46 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Test
+        run: dotnet test -c Release --no-build --verbosity normal
+
+      - name: Publish CLI
+        run: >
+          dotnet publish src/Pods.Cli -c Release -r win-x64
+          -p:PublishSingleFile=true --self-contained false -o out/cli
+
+      - name: Publish app
+        run: >
+          dotnet publish src/Pods.App -c Release -r win-x64
+          -p:PublishSingleFile=true --self-contained false -o out/app
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pods-win-x64
+          path: out/
+          if-no-files-found: error
